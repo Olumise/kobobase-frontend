@@ -98,10 +98,10 @@ export function Sidebar() {
                   href={item.href}
                   onClick={handleNavClick}
                   className={cn(
-                    "relative flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors group",
+                    "relative flex items-center px-3 py-2.5 text-base font-medium rounded-lg transition-colors group",
                     active 
-                      ? "text-primary bg-sidebar-accent" 
-                      : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-muted-foreground hover:text-primary-foreground hover:bg-primary"
                   )}
                 >
                   {active && (
@@ -113,7 +113,7 @@ export function Sidebar() {
                       transition={{ duration: 0.2 }}
                     />
                   )}
-                  <Icon className={cn("w-5 h-5 mr-3", active ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-foreground")} />
+                  <Icon className={cn("w-5 h-5 mr-3", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary-foreground")} />
                   {item.name}
                 </Link>
               );
