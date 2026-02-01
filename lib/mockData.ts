@@ -176,35 +176,65 @@ export const sampleTransactions = [
 export const sampleReceipts = [
   {
     id: 'rcp_001',
-    fileName: 'whole_foods_receipt.jpg',
-    uploadDate: '2024-01-29T10:30:00Z',
-    status: 'PROCESSED',
-    transactionCount: 8,
-    processedCount: 6,
+    userId: 'usr_001',
+    fileUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&auto=format&fit=crop',
+    fileType: 'image/jpeg',
+    fileSize: 245600,
+    rawOcrText: 'WHOLE FOODS MARKET\n1234 Main St, San Francisco, CA\n415-555-0123\n\nORG BANANAS $2.99\nALMOND MILK $4.49\nGRASS FED BEEF $12.99\nSOURDOUGH BREAD $5.50\nAVOCADO BAG $6.99\nSALMON FILLET $18.50\n\nTOTAL $51.46\n\nThank you for shopping with us!',
+    uploadedAt: '2024-01-29T10:30:00Z',
+    processedAt: '2024-01-29T10:30:03Z',
+    processingStatus: 'PROCESSED',
     documentType: 'Receipt',
-    totalAmount: 345.50,
-    previewUrl: '/placeholder-receipt.png' // We would normally use a real URL
+    expectedTransactions: 8,
+    detectionCompleted: true,
+    extractionMetadata: {
+      isPDF: false,
+      ocrConfidence: 94,
+      processingTime: 3.2
+    },
+    transactions: [],
+    batchSessions: []
   },
   {
     id: 'rcp_002',
-    fileName: 'uber_jan_28.pdf',
-    uploadDate: '2024-01-28T08:15:00Z',
-    status: 'PROCESSED',
-    transactionCount: 1,
-    processedCount: 1,
+    userId: 'usr_001',
+    fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    fileType: 'application/pdf',
+    fileSize: 13264,
+    rawOcrText: 'UBER RECEIPT\nRide from Downtown to Airport\nJan 28, 2024\nTotal: $15.00',
+    uploadedAt: '2024-01-28T08:15:00Z',
+    processedAt: '2024-01-28T08:15:02Z',
+    processingStatus: 'PROCESSED',
     documentType: 'Invoice',
-    totalAmount: 15.00,
-    previewUrl: '/placeholder-receipt.png'
+    expectedTransactions: 1,
+    detectionCompleted: true,
+    extractionMetadata: {
+      isPDF: true,
+      pageCount: 1,
+      ocrConfidence: 98,
+      processingTime: 2.1
+    },
+    transactions: [],
+    batchSessions: []
   },
   {
     id: 'rcp_003',
-    fileName: 'bank_statement_jan.pdf',
-    uploadDate: '2024-01-27T14:20:00Z',
-    status: 'PENDING',
-    transactionCount: 0,
-    processedCount: 0,
+    userId: 'usr_001',
+    fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    fileType: 'application/pdf',
+    fileSize: 425600,
+    rawOcrText: '',
+    uploadedAt: '2024-01-27T14:20:00Z',
+    processedAt: null,
+    processingStatus: 'PENDING',
     documentType: 'Bank Statement',
-    totalAmount: 0,
-    previewUrl: '/placeholder-receipt.png'
+    expectedTransactions: 0,
+    detectionCompleted: false,
+    extractionMetadata: {
+      isPDF: true,
+      pageCount: 3
+    },
+    transactions: [],
+    batchSessions: []
   }
 ]

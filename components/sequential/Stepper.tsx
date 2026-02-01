@@ -15,19 +15,18 @@ export function Stepper({ steps, currentStepIndex }: StepperProps) {
 
   return (
     <div className="w-full py-4">
-      <div className="relative flex justify-between">
+      <div className="relative flex justify-between items-start">
         {/* Background Line */}
-        <div className="absolute top-5 left-0 w-full h-0.5 bg-muted -z-10" />
-        
+        <div className="absolute top-5 left-0 right-0 h-0.5 bg-muted" style={{ left: '5%', right: '5%' }} />
+
         {/* Progress Line */}
-        <div className="absolute top-5 left-0 h-0.5 bg-primary -z-10">
-          <motion.div 
-            className="h-full bg-primary"
-            initial={{ width: 0 }}
-            animate={{ width: `${progressValue}%` }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
-          />
-        </div>
+        <motion.div
+          className="absolute top-5 h-0.5 bg-primary"
+          style={{ left: '5%' }}
+          initial={{ width: 0 }}
+          animate={{ width: `calc(${progressValue}% * 0.9)` }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+        />
 
         {steps.map((step, index) => {
           const isCompleted = index < currentStepIndex;
@@ -42,7 +41,7 @@ export function Stepper({ steps, currentStepIndex }: StepperProps) {
                   scale: isActive ? 1.1 : 1
                 }}
                 className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors duration-300 z-10 border-4 border-background",
+                  "relative w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors duration-300 border-4 border-background",
                   isCompleted || isActive ? "text-primary-foreground shadow-md bg-primary" : "text-muted-foreground bg-muted"
                 )}
               >

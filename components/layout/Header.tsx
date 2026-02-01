@@ -2,8 +2,7 @@
 'use client';
 
 import { Bell, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
-import { sampleUser } from '@/lib/mockData';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +19,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { logout } from '@/store/slices/authSlice';
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(logout());
+    router.push('/login');
+  };
 
   const getPageTitle = (path: string) => {
     if (path === '/dashboard') return 'Dashboard';
@@ -66,17 +75,18 @@ export function Header() {
         {/* User Profile Dropdown */}
         <div className="flex items-center gap-3 pl-2 border-l border-border">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-foreground leading-none">{sampleUser.name}</p>
-            <p className="text-xs text-muted-foreground mt-1">{sampleUser.email}</p>
+            <p className="text-sm font-medium text-foreground leading-none">{user?.name || 'User'}</p>
+            <p className="text-xs text-muted-foreground mt-1">{user?.email || ''}</p>
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
                 <Avatar className="h-9 w-9 border border-primary/20">
+                  {user?.image && <AvatarImage src={user.image} alt={user.name} />}
                   <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                    {sampleUser.name.charAt(0)}
-                    {sampleUser.name.split(' ')[1]?.charAt(0)}
+                    {user?.name.charAt(0)}
+                    {user?.name.split(' ')[1]?.charAt(0) || ''}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -84,9 +94,9 @@ export function Header() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{sampleUser.name}</p>
+                  <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {sampleUser.email}
+                    {user?.email || ''}
                   </p>
                 </div>
               </DropdownMenuLabel>
@@ -100,7 +110,7 @@ export function Header() {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>

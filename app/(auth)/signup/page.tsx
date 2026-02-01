@@ -18,6 +18,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import api from "@/lib/api"
+import { useAppDispatch } from "@/store/hooks"
+import { setAuth } from "@/store/slices/authSlice"
 
 const signupSchema = z.object({
   name: z.string().min(2, {
@@ -33,6 +37,9 @@ const signupSchema = z.object({
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const dispatch = useAppDispatch()
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -45,10 +52,20 @@ export default function SignupPage() {
 
   async function onSubmit(values: z.infer<typeof signupSchema>) {
     setIsLoading(true)
-    // Simulate API call
-    console.log(values)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    setError(null)
+    try {
+      const response = await api.post('/auth/signup', values)
+      const { token, user } = response.data.data
+      dispatch(setAuth({ token, user }))
+      console.log('Signup successful:', response.data)
+      router.push('/dashboard')
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 'Signup failed. Please try again.'
+      setError(errorMessage)
+      console.error('Signup failed:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -126,9 +143,14 @@ export default function SignupPage() {
                 </FormItem>
               )}
             />
-            <Button 
-              type="submit" 
-              className="w-full h-11 font-semibold text-base transition-all active:scale-[0.98]" 
+            {error && (
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                {error}
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full h-11 font-semibold text-base transition-all active:scale-[0.98]"
               disabled={isLoading}
             >
               {isLoading ? (

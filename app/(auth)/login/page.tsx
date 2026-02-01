@@ -19,6 +19,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import api from "@/lib/api"
+import { useAppDispatch } from "@/store/hooks"
+import { setAuth } from "@/store/slices/authSlice"
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -31,21 +35,33 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const dispatch = useAppDispatch()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "tolu@test.com",
+      password: "12345678",
     },
   })
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true)
-    // Simulate API call
-    console.log(values)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    setError(null)
+    try {
+      const response = await api.post('/auth/signin', values)
+      const { token, user } = response.data.data
+      dispatch(setAuth({ token, user }))
+      router.push('/dashboard')
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 'Login failed. Please try again.'
+      setError(errorMessage)
+      console.error('Login failed:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -103,9 +119,14 @@ export default function LoginPage() {
                 </FormItem>
               )}
             />
-            <Button 
-              type="submit" 
-              className="w-full h-11 font-semibold text-base transition-all active:scale-[0.98]" 
+            {error && (
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                {error}
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full h-11 font-semibold text-base transition-all active:scale-[0.98]"
               disabled={isLoading}
             >
               {isLoading ? (
