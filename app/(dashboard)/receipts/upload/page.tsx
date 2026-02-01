@@ -8,6 +8,14 @@ import { UploadCloud, FileText, X, ChevronRight, Loader2, CheckCircle2 } from 'l
 import { sampleBankAccounts } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const steps = [
   { id: 1, label: 'Uploading receipt...' },
@@ -83,7 +91,7 @@ export default function UploadReceiptPage() {
               >
                 <input {...getInputProps()} />
                 <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <UploadCloud className="text-muted-foreground w-8 h-8" />
+                   <UploadCloud className="text-muted-foreground w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-medium text-foreground mb-2">
                   Drag & drop or click to upload
@@ -103,12 +111,14 @@ export default function UploadReceiptPage() {
                     <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                   </div>
                 </div>
-                <button 
+                <Button 
+                  variant="ghost" 
+                  size="icon"
                   onClick={() => setFile(null)}
-                  className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                  className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted"
                 >
                   <X size={20} />
-                </button>
+                </Button>
               </div>
             )}
 
@@ -117,36 +127,37 @@ export default function UploadReceiptPage() {
               <label className="block text-sm font-medium text-foreground">
                 Select Bank Account <span className="text-destructive">*</span>
               </label>
-              <select
-                value={bankAccountId}
-                onChange={(e) => setBankAccountId(e.target.value)}
-                className="w-full h-11 px-4 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
-              >
-                <option value="" disabled>Select an account</option>
-                {sampleBankAccounts.map(account => (
-                  <option key={account.id} value={account.id}>
-                    {account.bankName} - {account.accountName} ({account.accountNumber})
-                  </option>
-                ))}
-              </select>
+              <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                <SelectTrigger className="w-full h-11 bg-background">
+                  <SelectValue placeholder="Select an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleBankAccounts.map(account => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.bankName} - {account.accountName} ({account.accountNumber})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <button 
+              <Button 
+                variant="outline"
                 onClick={() => router.back()}
-                className="px-6 py-2.5 rounded-lg border border-border text-foreground font-medium hover:bg-muted transition-colors"
+                className="px-6"
               >
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button 
                 onClick={handleUpload}
                 disabled={!file || !bankAccountId}
-                className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                className="px-6 flex items-center gap-2"
               >
                 Upload & Extract
-                <ChevronRight size={18} className="ml-2" />
-              </button>
+                <ChevronRight size={18} />
+              </Button>
             </div>
           </div>
         ) : (

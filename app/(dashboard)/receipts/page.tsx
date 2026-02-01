@@ -16,6 +16,7 @@ import {
 import { sampleReceipts } from '@/lib/mockData';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
 
 export default function ReceiptsPage() {
   const [filter, setFilter] = useState('All');
@@ -33,13 +34,12 @@ export default function ReceiptsPage() {
           <h1 className="text-2xl font-semibold text-foreground">Receipts</h1>
           <p className="text-muted-foreground mt-1">Manage and process your uploaded documents</p>
         </div>
-        <Link 
-          href="/receipts/upload" 
-          className="flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-sm"
-        >
-          <Plus size={18} className="mr-2" />
-          Upload Receipt
-        </Link>
+        <Button asChild>
+          <Link href="/receipts/upload">
+            <Plus size={18} className="mr-2" />
+            Upload Receipt
+          </Link>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -59,19 +59,16 @@ export default function ReceiptsPage() {
               key={status}
               onClick={() => setFilter(status)}
               className={cn(
-                "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                "cursor-pointer px-3 py-0.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
                 filter === status 
                   ? "bg-primary/10 text-primary border border-primary/20" 
-                  : "bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent"
+                  : "bg-muted text-muted-foreground hover:border-primary/20 border border-transparent"
               )}
             >
               {status}
             </button>
           ))}
-          <button className="px-3 py-1.5 rounded-full text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent flex items-center">
-            <Filter size={14} className="mr-2" />
-            More Filters
-          </button>
+        
         </div>
       </div>
 

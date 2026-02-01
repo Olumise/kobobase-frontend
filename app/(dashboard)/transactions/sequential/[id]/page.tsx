@@ -1,13 +1,15 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { 
-  CheckCircle2, 
-  ArrowRight, 
-  RefreshCw,
-  X
+  ArrowLeft, 
+  ChevronLeft, 
+  ChevronRight, 
+  MessageSquare, 
+  Save, 
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sampleTransactions } from '@/lib/mockData';
@@ -15,175 +17,153 @@ import { Stepper } from '@/components/sequential/Stepper';
 import { TransactionReviewCard, TransactionState } from '@/components/sequential/TransactionReviewCard';
 import { ClarificationChat } from '@/components/sequential/ClarificationChat';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 
 export default function SequentialProcessingPage() {
+  const params = useParams();
   const router = useRouter();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [completedIndices, setCompletedIndices] = useState<number[]>([]);
-  const [transactions, setTransactions] = useState(sampleTransactions);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [showCompletion, setShowCompletion] = useState(false);
   
-  // Local state for the current transaction
-  const [currentState, setCurrentState] = useState<TransactionState>('READY');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [processState, setProcessState] = useState<Record<string, TransactionState>>({
+    'txn_001': 'READY',
+    'txn_002': 'CLARIFICATION_NEEDED',
+    'txn_003': 'NEEDS_CONFIRMATION',
+  });
 
-  const currentTransaction = transactions[currentIndex];
-  const total = transactions.length;
+  const transactions = sampleTransactions.slice(0, 5);
+  const currentTxn = transactions[currentIndex];
+  
+  const steps = transactions.map((_, i) => ({
+    id: `step-${i}`,
+    label: `Transaction ${i + 1}`
+  }));
 
-  useEffect(() => {
-    // Mock logic: 3rd transaction (index 2) needs clarification initially
-    if (currentIndex === 2 && !completedIndices.includes(2)) {
-      setCurrentState('CLARIFICATION_NEEDED');
-    } else {
-      setCurrentState('READY');
-    }
-  }, [currentIndex, completedIndices]);
-
-  const handleApprove = async () => {
-    // Show saving state or toast here if we had one
-    // setSaving(true)... await...
-    
-    setCompletedIndices(prev => [...prev, currentIndex]);
-    
-    if (currentIndex < total - 1) {
+  const handleApprove = () => {
+    if (currentIndex < transactions.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      setShowCompletion(true);
+      // Finished
+      router.push('/dashboard');
     }
   };
 
-  const handleSkip = () => {
-    if (confirm("Skip this transaction? It will not be saved.")) {
-       if (currentIndex < total - 1) {
-         setCurrentIndex(prev => prev + 1);
-       } else {
-         setShowCompletion(true);
-       }
+  const handleBack = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
     }
   };
 
-  const handleClarify = () => {
-    setIsChatOpen(true);
-  };
-
-  const handleChatComplete = () => {
-    setIsChatOpen(false);
-    setCurrentState('READY');
-    // Maybe show a success toast here
-  };
+  const currentTxnState = processState[currentTxn.id] || 'READY';
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex overflow-hidden -m-6 lg:-m-8">
-      {/* LEFT COLUMN: Receipt Preview (Desktop only) */}
-      <div className="hidden lg:flex w-[40%] bg-zinc-900 flex-col border-r border-sidebar-border relative">
-        <div className="p-4 bg-zinc-950/50 backdrop-blur border-b border-zinc-800 text-zinc-400 text-sm flex justify-between items-center">
-            <span>Receipt Preview</span>
-            <button className="p-1.5 hover:bg-zinc-800 rounded transition-colors"><RefreshCw size={14} /></button>
+    <div className="min-h-[calc(100vh-8rem)] flex flex-col">
+      {/* Top Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft size={20} />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              Review Session 
+              <Badge variant="secondary" className="font-mono text-xs">sess_001</Badge>
+            </h1>
+            <p className="text-sm text-muted-foreground">Review and approve extracted transactions</p>
+          </div>
         </div>
-        <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-zinc-900/50">
-             {/* Mock Receipt (Simplified) */}
-             <div className="bg-white text-zinc-900 font-mono text-xs p-8 shadow-2xl min-h-[600px] w-full max-w-sm opacity-90 scale-90 origin-top">
-                <div className="text-center font-semibold text-xl mb-4">RECEIPT</div>
-                <div className="space-y-4">
-                  {transactions.map((t, idx) => (
-                    <div key={t.id} className={cn(
-                      "flex justify-between p-1 transition-colors",
-                      idx === currentIndex ? "bg-primary/30 ring-2 ring-primary rounded scale-105 font-semibold" : ""
-                    )}>
-                      <span>{t.description.substring(0, 15)}...</span>
-                      <span>${t.amount.toFixed(2)}</span>
-                    </div>
-                  ))}
-                  <div className="border-t border-black my-4"></div>
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span>TOTAL</span>
-                    <span>${transactions.reduce((acc, t) => acc + t.amount, 0).toFixed(2)}</span>
-                  </div>
-                </div>
-             </div>
+
+        <div className="flex items-center gap-2">
+           <Button variant="outline" className="gap-2 hidden sm:flex">
+             <Save size={16} /> Save Draft
+           </Button>
+           <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+             <CheckCircle2 size={16} /> Finish Session
+           </Button>
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Processing Interface */}
-      <div className="flex-1 flex flex-col bg-background relative z-0">
-        <Stepper total={total} current={currentIndex} completed={completedIndices} />
-        
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
-          <AnimatePresence mode='wait'>
-            <motion.div
-              key={currentIndex}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="w-full"
-            >
-              <TransactionReviewCard 
-                transaction={currentTransaction}
-                state={currentState}
-                onApprove={handleApprove}
-                onSkip={handleSkip}
-                onClarify={handleClarify}
-              />
-            </motion.div>
-          </AnimatePresence>
-        </main>
+      {/* Progress Stepper Section */}
+      <Card className="p-4 mb-8 bg-card/50 border-dashed">
+        <Stepper 
+          steps={steps}
+          currentStepIndex={currentIndex}
+        />
+      </Card>
+
+      <div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full pb-12">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentTxn.id}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="w-full"
+          >
+            <TransactionReviewCard 
+              transaction={currentTxn}
+              state={currentTxnState}
+              onApprove={handleApprove}
+              onSkip={() => {}}
+              onClarify={() => setIsChatOpen(true)}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation Info */}
+        <div className="mt-8 flex items-center gap-12 text-sm text-muted-foreground font-medium">
+           <button 
+             onClick={handleBack}
+             disabled={currentIndex === 0}
+             className="flex items-center gap-1 hover:text-foreground disabled:opacity-30 transition-colors"
+           >
+             <ChevronLeft size={16} /> Previous
+           </button>
+           
+           <div className="flex items-center gap-2">
+             <Sparkles size={14} className="text-primary" />
+             <span>AI Assisted Verification Active</span>
+           </div>
+
+           <button 
+             onClick={handleApprove}
+             disabled={currentIndex === transactions.length - 1}
+             className="flex items-center gap-1 hover:text-foreground disabled:opacity-30 transition-colors"
+           >
+             Next <ChevronRight size={16} />
+           </button>
+        </div>
       </div>
 
-      {/* Clarification Chat */}
+      {/* Clarification Side Panel */}
       <ClarificationChat 
-        transactionId={currentTransaction.id}
+        transactionId={currentTxn.id}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        onComplete={handleChatComplete}
+        onComplete={() => {
+          setProcessState(prev => ({
+            ...prev,
+            [currentTxn.id]: 'READY'
+          }));
+          setIsChatOpen(false);
+        }}
       />
-
-      {/* Completion Modal */}
-      <AnimatePresence>
-        {showCompletion && (
-           <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-             <motion.div 
-               initial={{ opacity: 0, scale: 0.9 }}
-               animate={{ opacity: 1, scale: 1 }}
-               className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-8 text-center"
-             >
-               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                 <CheckCircle2 size={40} />
-               </div>
-               <h2 className="text-2xl font-semibold text-foreground mb-2">Sequential Processing Complete</h2>
-               <p className="text-muted-foreground mb-8">
-                 You have successfully reviewed all {total} transactions from this receipt.
-               </p>
-               
-               <div className="bg-muted/30 rounded-xl p-4 mb-8 grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-semibold text-emerald-600">{completedIndices.length}</div>
-                    <div className="text-xs text-muted-foreground uppercase">Approved</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-semibold text-foreground">{total - completedIndices.length}</div>
-                    <div className="text-xs text-muted-foreground uppercase">Skipped</div>
-                  </div>
-               </div>
-
-               <div className="flex flex-col gap-3">
-                 <button 
-                    onClick={() => router.push('/transactions')}
-                    className="w-full py-3 bg-primary text-primary-foreground font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg"
-                 >
-                   View All Transactions
-                 </button>
-                 <button 
-                    onClick={() => router.push('/receipts/upload')}
-                    className="w-full py-3 bg-transparent text-muted-foreground hover:text-foreground font-medium transition-colors"
-                 >
-                   Upload Another Receipt
-                 </button>
-               </div>
-             </motion.div>
-           </div>
-        )}
-      </AnimatePresence>
+      
+      {/* Floating Chat Trigger (Mobile Only) */}
+      <Button 
+        size="icon"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl lg:hidden"
+        onClick={() => setIsChatOpen(true)}
+      >
+        <MessageSquare size={24} />
+      </Button>
     </div>
   );
 }

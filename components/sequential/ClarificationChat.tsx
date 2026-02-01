@@ -5,6 +5,18 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, X, Bot, User, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ClarificationChatProps {
   transactionId: string;
@@ -55,105 +67,83 @@ export function ClarificationChat({ transactionId, isOpen, onClose, onComplete }
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-          />
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="w-full sm:w-[450px] p-0 flex flex-col gap-0 border-l border-border shadow-2xl">
+        <SheetHeader className="p-4 border-b border-border bg-muted/30">
+          <SheetTitle className="text-lg font-semibold text-foreground">Clarify Transaction</SheetTitle>
+          <SheetDescription className="text-xs text-muted-foreground">ID: {transactionId}</SheetDescription>
+        </SheetHeader>
 
-          {/* Chat Panel */}
-          <motion.div 
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] bg-background border-l border-border shadow-2xl flex flex-col"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-              <div>
-                <h3 className="font-semibold text-foreground">Clarify Transaction</h3>
-                <p className="text-xs text-muted-foreground">ID: {transactionId}</p>
-              </div>
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
+        {/* Messages Area */}
+        <ScrollArea className="flex-1 p-4 bg-muted/5">
+          <div className="space-y-4">
+            {messages.map((msg, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "flex gap-3 max-w-[85%]",
+                  msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                )}
               >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/5">
-              {messages.map((msg, idx) => (
-                <div 
-                  key={idx} 
-                  className={cn(
-                    "flex gap-3 max-w-[85%]",
-                    msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
-                  )}
-                >
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs",
-                    msg.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  )}>
+                <Avatar className={cn(
+                  "w-8 h-8",
+                  msg.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  <AvatarFallback className="text-[10px]">
                     {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-                  </div>
-                  <div className={cn(
-                    "p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-line shadow-sm",
-                    msg.role === 'user' 
-                      ? "bg-primary text-primary-foreground rounded-tr-sm" 
-                      : "bg-card border border-border text-foreground rounded-tl-sm"
-                  )}>
-                    {msg.content}
-                  </div>
+                  </AvatarFallback>
+                </Avatar>
+                <div className={cn(
+                  "p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-line shadow-sm",
+                  msg.role === 'user' 
+                    ? "bg-primary text-primary-foreground rounded-tr-sm" 
+                    : "bg-card border border-border text-foreground rounded-tl-sm"
+                )}>
+                  {msg.content}
                 </div>
-              ))}
-              
-              {isTyping && (
-                <div className="flex gap-3 mr-auto max-w-[85%]">
-                   <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center flex-shrink-0">
-                     <Bot size={14} />
-                   </div>
-                   <div className="bg-card border border-border p-3 rounded-2xl rounded-tl-sm flex items-center gap-1">
-                     <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                     <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                     <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                   </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="p-4 border-t border-border bg-background">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Type your answer..."
-                  className="flex-1 bg-muted/20 border border-input rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <button 
-                  onClick={handleSend}
-                  disabled={!input.trim() || isTyping}
-                  className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send size={18} />
-                </button>
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            ))}
+            
+            {isTyping && (
+              <div className="flex gap-3 mr-auto max-w-[85%]">
+                <Avatar className="w-8 h-8 bg-muted text-muted-foreground">
+                  <AvatarFallback className="text-[10px]">
+                    <Bot size={14} />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="bg-card border border-border p-3 rounded-2xl rounded-tl-sm flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="p-4 border-t border-border bg-background">
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Type your answer..."
+              className="flex-1 rounded-lg bg-muted/20 border-input focus:bg-background h-10 px-4"
+            />
+            <Button 
+              size="icon"
+              onClick={handleSend}
+              disabled={!input.trim() || isTyping}
+              className="rounded-lg h-10 w-10 shrink-0"
+            >
+              <Send size={18} />
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

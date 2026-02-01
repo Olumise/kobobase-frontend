@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -47,20 +48,27 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Toggle Button */}
-      <button 
-        className="fixed top-4 left-4 z-50 lg:hidden p-2 bg-white rounded-md shadow-md"
+      <Button 
+        variant="outline"
+        size="icon"
+        className="fixed top-4 left-4 z-50 lg:hidden bg-background shadow-md border-border"
         onClick={toggleSidebar}
       >
         {isOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
+      </Button>
 
       {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Sidebar Container */}
       <aside className={cn(
@@ -114,10 +122,13 @@ export function Sidebar() {
 
           {/* User Profile / Footer */}
           <div className="p-4 border-t border-sidebar-border">
-            <button className="flex items-center w-full px-3 py-2 text-sm font-medium text-muted-foreground hover:text-sidebar-foreground rounded-lg hover:bg-sidebar-accent/50 transition-colors">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+            >
               <LogOut className="w-5 h-5 mr-3" />
               Sign Out
-            </button>
+            </Button>
           </div>
         </div>
       </aside>

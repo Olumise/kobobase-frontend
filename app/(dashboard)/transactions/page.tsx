@@ -15,6 +15,8 @@ import {
 import { sampleTransactions, sampleCategories } from '@/lib/mockData';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState('ALL');
@@ -39,10 +41,10 @@ export default function TransactionsPage() {
           <h1 className="text-2xl font-semibold text-foreground">Transactions</h1>
           <p className="text-muted-foreground mt-1">View and manage your financial records</p>
         </div>
-        <button className="flex items-center justify-center px-4 py-2 bg-background border border-border rounded-lg hover:bg-muted transition-colors font-medium shadow-sm">
+        <Button variant="outline" className="shadow-sm">
           <Download size={18} className="mr-2" />
           Export CSV
-        </button>
+        </Button>
       </div>
 
       {/* Summary Stats */}
@@ -50,9 +52,9 @@ export default function TransactionsPage() {
         <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
            <div>
              <p className="text-xs text-muted-foreground uppercase font-semibold">Total Income</p>
-             <p className="text-xl font-semibold text-emerald-600 mt-1">{formatCurrency(totalIncome)}</p>
+             <p className="text-xl font-semibold text-primary mt-1">{formatCurrency(totalIncome)}</p>
            </div>
-           <div className="w-10 h-10 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center">
+           <div className="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
              <ArrowUpRight size={20} />
            </div>
         </div>
@@ -79,45 +81,41 @@ export default function TransactionsPage() {
       {/* Filters */}
       <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center">
         <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+          <Input
             type="text"
             placeholder="Search descriptions, merchants..."
-            className="w-full h-10 pl-9 pr-4 rounded-lg border border-input bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            className="pl-9 bg-background/50 border-border"
           />
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto w-full pb-2 md:pb-0">
-          <button 
-             onClick={() => setFilterType('ALL')}
-             className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-colors border", 
-               filterType === 'ALL' ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"
-           )}>
-             All
-           </button>
-           <button 
-             onClick={() => setFilterType('INCOME')}
-             className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-colors border", 
-               filterType === 'INCOME' ? "bg-emerald-600 text-white border-emerald-600" : "bg-background border-border hover:bg-muted"
-           )}>
-             Income
-           </button>
-           <button 
-             onClick={() => setFilterType('EXPENSE')}
-             className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-colors border", 
-               filterType === 'EXPENSE' ? "bg-rose-600 text-white border-rose-600" : "bg-background border-border hover:bg-muted"
-           )}>
-             Expense
-           </button>
+          <Button 
+            variant={filterType === 'ALL' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterType('ALL')}
+          >
+            All
+          </Button>
+          <Button 
+            variant={filterType === 'INCOME' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterType('INCOME')}
+            className={cn(filterType === 'INCOME' && "bg-emerald-600 hover:bg-emerald-700")}
+          >
+            Income
+          </Button>
+          <Button 
+            variant={filterType === 'EXPENSE' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterType('EXPENSE')}
+            className={cn(filterType === 'EXPENSE' && "bg-rose-600 hover:bg-rose-700")}
+          >
+            Expense
+          </Button>
         </div>
         
-        <div className="ml-auto">
-          <button className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground">
-             <Filter size={16} className="mr-2" />
-             Advanced Filters
-             <ChevronDown size={14} className="ml-1" />
-          </button>
-        </div>
+    
       </div>
 
       {/* Transactions Table */}

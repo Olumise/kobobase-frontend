@@ -7,12 +7,38 @@ import {
   DollarSign, 
   CreditCard,
   TrendingUp,
-  Activity
+  Activity,
+  ChevronRight
 } from 'lucide-react';
+import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn, formatCurrency } from '@/lib/utils';
 import { sampleTransactions, sampleCategories } from '@/lib/mockData';
 import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Mock Chart Data
 const chartData = [
@@ -25,32 +51,61 @@ const chartData = [
 ];
 
 const pieData = [
-  { name: 'Food', value: 400, color: '#f59e0b' },
-  { name: 'Transport', value: 300, color: '#3b82f6' },
-  { name: 'Shopping', value: 300, color: '#ec4899' },
-  { name: 'Ent.', value: 200, color: '#8b5cf6' },
+  { name: 'Food', value: 400, color: "var(--chart-1)", fill: "var(--color-food)" },
+  { name: 'Transport', value: 300, color: "var(--chart-2)", fill: "var(--color-transport)" },
+  { name: 'Shopping', value: 300, color: "var(--chart-3)", fill: "var(--color-shopping)" },
+  { name: 'Ent.', value: 200, color: "var(--chart-4)", fill: "var(--color-ent)" },
 ];
+
+const areaChartConfig = {
+  income: {
+    label: "Income",
+    color: "var(--primary)",
+  },
+  expense: {
+    label: "Expense",
+    color: "var(--destructive)",
+  },
+} satisfies ChartConfig
+
+const pieChartConfig = {
+  food: {
+    label: "Food",
+    color: "var(--chart-1)",
+  },
+  transport: {
+    label: "Transport",
+    color: "var(--chart-2)",
+  },
+  shopping: {
+    label: "Shopping",
+    color: "var(--chart-3)",
+  },
+  ent: {
+    label: "Ent.",
+    color: "var(--chart-4)",
+  },
+} satisfies ChartConfig
 
 const StatCard = ({ title, value, change, trend, icon: Icon, delay }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.4 }}
-    className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+    className="h-full"
   >
-    <div className="flex justify-between items-start mb-4">
-      <div className="p-2 bg-primary/10 rounded-lg text-primary">
-        <Icon size={20} />
-      </div>
-      <div className={cn("flex items-center text-sm font-medium px-2 py-1 rounded-full", 
-        trend === 'up' ? "text-emerald-600 bg-emerald-500/10" : "text-rose-600 bg-rose-500/10"
-      )}>
-        {trend === 'up' ? <ArrowUpRight size={14} className="mr-1" /> : <ArrowDownRight size={14} className="mr-1" />}
-        {change}
-      </div>
-    </div>
-    <h3 className="text-muted-foreground text-sm font-medium">{title}</h3>
-    <p className="text-2xl font-semibold text-foreground mt-1">{value}</p>
+    <Card className="h-full hover:shadow-md transition-shadow">
+      <CardContent className="">
+        <div className="flex justify-between items-start mb-4">
+          <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <Icon size={20} />
+          </div>
+         
+        </div>
+        <h3 className="text-muted-foreground text-sm font-medium">{title}</h3>
+        <p className="text-2xl font-semibold text-foreground mt-1">{value}</p>
+      </CardContent>
+    </Card>
   </motion.div>
 );
 
@@ -100,40 +155,51 @@ export default function Dashboard() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
-          className="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm"
+          className="lg:col-span-2"
         >
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-foreground">Income vs Expenses</h2>
-            <select className="bg-muted/50 border border-input rounded-lg text-sm px-3 py-1 outline-none focus:ring-2 focus:ring-primary/20">
-              <option>Last 6 Months</option>
-              <option>This Year</option>
-            </select>
-          </div>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)' }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
-                  itemStyle={{ color: 'var(--foreground)' }}
-                />
-                <Area type="monotone" dataKey="income" stroke="#14b8a6" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
-                <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorExpense)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-8">
+              <div className="space-y-1">
+                <CardTitle className="text-lg font-semibold">Income vs Expenses</CardTitle>
+                <CardDescription>Visual breakdown of your flow</CardDescription>
+              </div>
+              <Select defaultValue="6months">
+                <SelectTrigger className="w-40 bg-muted/50">
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6months">Last 6 Months</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={areaChartConfig} className="h-80 w-full">
+                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-expense)" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="var(--color-expense)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)' }} />
+                  <ChartTooltip 
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
+                  />
+                  <Area type="monotone" dataKey="income" stroke="var(--color-income)" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
+                  <Area type="monotone" dataKey="expense" stroke="var(--color-expense)" strokeWidth={3} fillOpacity={1} fill="url(#colorExpense)" />
+                </AreaChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Category Breakdown Pie Chart */}
@@ -141,81 +207,95 @@ export default function Dashboard() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.6 }}
-          className="bg-card border border-border rounded-xl p-6 shadow-sm"
+          className="h-full"
         >
-          <h2 className="text-lg font-semibold text-foreground mb-6">Spend by Category</h2>
-          <div className="h-64 w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            {/* Center Text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-xs text-muted-foreground uppercase font-medium">Top Spend</span>
-              <span className="text-xl font-semibold text-foreground">Food</span>
-            </div>
-          </div>
-          
-          <div className="space-y-3 mt-4">
-            {pieData.map((item, i) => (
-              <div key={i} className="flex justify-between items-center text-sm">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></div>
-                  <span className="text-muted-foreground">{item.name}</span>
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Spend by Category</CardTitle>
+              <CardDescription>Top spending categories</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 w-full relative">
+                <ChartContainer config={pieChartConfig} className="h-full w-full">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip 
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                  </PieChart>
+                </ChartContainer>
+                {/* Center Text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-xs text-muted-foreground uppercase font-medium">Top Spend</span>
+                  <span className="text-xl font-semibold text-foreground">Food</span>
                 </div>
-                <span className="font-medium text-foreground">{item.value/10}%</span>
               </div>
-            ))}
-          </div>
+              
+              <div className="space-y-3 mt-4">
+                {pieData.map((item, i) => (
+                  <div key={i} className="flex justify-between items-center text-sm">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-muted-foreground">{item.name}</span>
+                    </div>
+                    <span className="font-medium text-foreground">{item.value/10}%</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
 
       {/* SECTION: Recent Transactions */}
       <div className="space-y-4">
-        <div className="flex justify-between items-end">
-          <h2 className="text-xl font-semibold text-foreground">Recent Transactions</h2>
-          <button className="text-sm text-primary hover:underline font-medium">View All</button>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-foreground tracking-tight">Recent Transactions</h2>
+          <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/10" asChild>
+            <Link href="/transactions">
+              View All
+              <ChevronRight size={16} className="ml-1" />
+            </Link>
+          </Button>
         </div>
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="bg-card border border-border rounded-xl overflow-hidden shadow-sm"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-muted-foreground font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-4">Transaction</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6 py-4">Transaction</TableHead>
+                  <TableHead className="px-6 py-4">Category</TableHead>
+                  <TableHead className="px-6 py-4">Date</TableHead>
+                  <TableHead className="px-6 py-4">Status</TableHead>
+                  <TableHead className="px-6 py-4 text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {sampleTransactions.slice(0, 5).map((txn, i) => {
                   const CategoryIcon = sampleCategories.find(c => c.id === txn.categoryId)?.icon || CreditCard;
                   const categoryColor = sampleCategories.find(c => c.id === txn.categoryId)?.color || '#9ca3af';
 
                   return (
-                    <tr key={txn.id} className="hover:bg-muted/20 transition-colors group">
-                      <td className="px-6 py-4">
+                    <TableRow key={txn.id} className="hover:bg-muted/20 transition-colors group">
+                      <TableCell className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full flex items-center justify-center mr-4 bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                             <CategoryIcon size={18} />
@@ -225,36 +305,40 @@ export default function Dashboard() {
                             <p className="text-xs text-muted-foreground">{txn.merchant}</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
-                          style={{ backgroundColor: `${categoryColor}20`, color: categoryColor }}>
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Badge variant="outline" className="font-medium" style={{ 
+                          backgroundColor: `${categoryColor}15`, 
+                          color: categoryColor,
+                          borderColor: `${categoryColor}30` 
+                        }}>
                           {sampleCategories.find(c => c.id === txn.categoryId)?.name || 'Uncategorized'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-muted-foreground whitespace-nowrap">
                         {txn.transactionDate}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", 
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Badge variant="outline" className={cn(
+                          "font-medium",
                           txn.status === 'CONFIRMED' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : 
                           txn.status === 'PENDING' ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
                           "bg-zinc-100 text-zinc-600 border-zinc-200"
                         )}>
                           {txn.status === 'CONFIRMED' ? 'Completed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td className={cn("px-6 py-4 text-right font-semibold", 
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={cn("px-6 py-4 text-right font-semibold", 
                         txn.transactionType === 'INCOME' ? "text-emerald-600" : "text-foreground"
                       )}>
                         {txn.transactionType === 'INCOME' ? '+' : '-'}{formatCurrency(txn.amount)}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
         </motion.div>
       </div>
     </div>
