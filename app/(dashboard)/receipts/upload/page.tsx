@@ -5,17 +5,9 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, FileText, X, ChevronRight, Loader2, CheckCircle2 } from 'lucide-react';
-import { sampleBankAccounts } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const steps = [
   { id: 1, label: 'Uploading receipt...' },
@@ -26,7 +18,6 @@ const steps = [
 export default function UploadReceiptPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [bankAccountId, setBankAccountId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -47,7 +38,7 @@ export default function UploadReceiptPage() {
   });
 
   const handleUpload = async () => {
-    if (!file || !bankAccountId) return;
+    if (!file) return;
 
     setIsProcessing(true);
 
@@ -122,25 +113,6 @@ export default function UploadReceiptPage() {
               </div>
             )}
 
-            {/* Form Fields */}
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-foreground">
-                Select Bank Account <span className="text-destructive">*</span>
-              </label>
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger className="w-full h-11 bg-background">
-                  <SelectValue placeholder="Select an account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sampleBankAccounts.map(account => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.bankName} - {account.accountName} ({account.accountNumber})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-border">
               <Button 
@@ -150,9 +122,9 @@ export default function UploadReceiptPage() {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleUpload}
-                disabled={!file || !bankAccountId}
+                disabled={!file}
                 className="px-6 flex items-center gap-2"
               >
                 Upload & Extract

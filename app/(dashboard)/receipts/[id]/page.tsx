@@ -23,6 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ReceiptPreview } from "@/components/receipts/ReceiptPreview";
 import { receiptsApi } from '@/lib/api';
+import { useSequentialProcessing } from '@/hooks/useSequentialProcessing';
+import { BankAccountSelector } from '@/components/receipts/BankAccountSelector';
 
 interface Receipt {
   id: string;
@@ -54,8 +56,18 @@ export default function ReceiptDetailsPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isInitiating, setIsInitiating] = useState(false);
-  const [loadingText, setLoadingText] = useState('Initiating AI extraction...');
+  const [showBankSelector, setShowBankSelector] = useState(false);
+
+  // SSE Progress Hook
+  const {
+    progress,
+    message: progressMessage,
+    step: progressStep,
+    isProcessing,
+    result: processingResult,
+    error: processingError,
+    initiateProcessing,
+  } = useSequentialProcessing();
 
   useEffect(() => {
     const fetchReceipt = async () => {
@@ -97,21 +109,35 @@ export default function ReceiptDetailsPage() {
   }, [params.id]);
 
   const handleInitiateProcessing = async () => {
-    setIsInitiating(true);
-
-    const messages = [
-      'Initiating AI extraction...',
-      'Analyzing transactions...',
-      'Enriching transaction data...'
-    ];
-
-    for (let i = 0; i < messages.length; i++) {
-      setLoadingText(messages[i]);
-      await new Promise(resolve => setTimeout(resolve, 1200));
-    }
-
-    router.push(`/transactions/sequential/sess_001`);
+    // Show bank account selector
+    setShowBankSelector(true);
   };
+
+  const handleBankAccountSelected = async (bankAccountId: string) => {
+    if (!receipt?.id) return;
+
+    // Close the bank selector
+    setShowBankSelector(false);
+
+    // Start the SSE processing
+    await initiateProcessing(receipt.id, bankAccountId);
+  };
+
+  // Handle processing completion
+  useEffect(() => {
+    if (processingResult?.batch_session_id) {
+      // Navigate to the sequential processing page with the batch session ID
+      router.push(`/transactions/sequential/${processingResult.batch_session_id}`);
+    }
+  }, [processingResult, router]);
+
+  // Handle processing errors
+  useEffect(() => {
+    if (processingError) {
+      console.error('Processing error:', processingError);
+      // You could add a toast notification here
+    }
+  }, [processingError]);
 
   // Loading state
   if (isLoading) {
@@ -347,10 +373,18 @@ export default function ReceiptDetailsPage() {
         </div>
       </div>
 
-      {/* Full Screen Loading Modal */}
+      {/* Bank Account Selector Modal */}
+      <BankAccountSelector
+        isOpen={showBankSelector}
+        onClose={() => setShowBankSelector(false)}
+        onSelect={handleBankAccountSelected}
+        isLoading={isProcessing}
+      />
+
+      {/* Full Screen Loading Modal with SSE Progress */}
       <AnimatePresence>
-        {isInitiating && (
-          <motion.div 
+        {isProcessing && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -364,26 +398,45 @@ export default function ReceiptDetailsPage() {
                   <Zap className="text-primary w-8 h-8 fill-primary" />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold text-foreground animate-pulse">Processing Transactions</h2>
-                <p className="text-muted-foreground">Please wait while we prepare your session...</p>
+                <h2 className="text-2xl font-semibold text-foreground">Processing Transactions</h2>
+                <p className="text-muted-foreground">Please wait while we extract and analyze your transactions...</p>
               </div>
 
               <Card className="p-4 shadow-sm w-full bg-card">
                 <div className="flex items-center justify-between text-sm mb-3">
-                  <span className="font-medium text-foreground">{loadingText}</span>
-                  <Badge variant="secondary" className="font-mono">8 items</Badge>
+                  <span className="font-medium text-foreground">{progressMessage || 'Initializing...'}</span>
+                  <Badge variant="secondary" className="font-mono">{progress}%</Badge>
                 </div>
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     className="h-full bg-primary"
                     initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 3, ease: "easeInOut" }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
                   />
                 </div>
+
+                {/* Step indicator */}
+                {progressStep && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                      <span className="capitalize">{progressStep?.replace(/_/g, ' ') || ''}</span>
+                    </div>
+                  </div>
+                )}
               </Card>
+
+              {processingError && (
+                <Card className="p-4 shadow-sm w-full bg-destructive/5 border-destructive/20">
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle size={16} />
+                    <span className="font-medium">{processingError}</span>
+                  </div>
+                </Card>
+              )}
             </div>
           </motion.div>
         )}

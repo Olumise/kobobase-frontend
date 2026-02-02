@@ -283,7 +283,7 @@ export default function ReceiptsPage() {
                       </div>
 
                       <div className="text-xs text-muted-foreground mb-4 capitalize">
-                        {receipt.documentType.replace('_', ' ')}
+                        {receipt.documentType?.replace(/_/g, ' ') || 'Receipt'}
                       </div>
 
                       <div className="mt-auto pt-4 border-t border-border flex justify-between items-center text-sm">
