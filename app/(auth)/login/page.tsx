@@ -20,9 +20,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import api from "@/lib/api"
 import { useAppDispatch } from "@/store/hooks"
-import { setAuth } from "@/store/slices/authSlice"
+import { setUser } from "@/store/slices/authSlice"
+import { login } from "@/lib/auth"
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -51,9 +51,9 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await api.post('/auth/signin', values)
-      const { token, user } = response.data.data
-      dispatch(setAuth({ token, user }))
+      // Login will set HTTP-only cookies automatically via Better Auth
+      const user = await login(values.email, values.password)
+      dispatch(setUser(user))
       router.push('/dashboard')
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || 'Login failed. Please try again.'

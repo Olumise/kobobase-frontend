@@ -18,7 +18,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { clearUser } from '@/store/slices/authSlice';
+import { logout as logoutUser } from '@/lib/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -37,9 +38,20 @@ export function Sidebar() {
   // Mobile toggle
   const toggleSidebar = () => setIsOpen(!isOpen);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // Call backend to clear session cookies
+      await logoutUser();
+      // Clear user from Redux store
+      dispatch(clearUser());
+      // Redirect to login
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still clear local state and redirect even if API call fails
+      dispatch(clearUser());
+      router.push('/login');
+    }
   };
 
   // Close on mobile navigation

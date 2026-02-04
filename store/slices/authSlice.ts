@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import type { AppDispatch } from '../index'
 
 interface User {
   id: string
@@ -12,48 +13,67 @@ interface User {
 
 interface AuthState {
   user: User | null
-  token: string | null
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const initialState: AuthState = {
   user: null,
-  token: null,
   isAuthenticated: false,
+  isLoading: false,
 }
 
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setAuth: (state, action: PayloadAction<{ token: string; user: User }>) => {
-      state.token = action.payload.token
-      state.user = action.payload.user
+    setUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload
       state.isAuthenticated = true
+      state.isLoading = false
 
-      localStorage.setItem('token', action.payload.token)
-      localStorage.setItem('user', JSON.stringify(action.payload.user))
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(action.payload))
+      }
     },
-    logout: (state) => {
-      state.token = null
+    clearUser: (state) => {
       state.user = null
       state.isAuthenticated = false
+      state.isLoading = false
 
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-    },
-    loadAuthFromStorage: (state) => {
-      const token = localStorage.getItem('token')
-      const userStr = localStorage.getItem('user')
-
-      if (token && userStr) {
-        state.token = token
-        state.user = JSON.parse(userStr)
-        state.isAuthenticated = true
+      // Clear from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('user')
       }
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload
+    },
+    hydrate: (state, action: PayloadAction<User>) => {
+      state.user = action.payload
+      state.isAuthenticated = true
+      state.isLoading = false
     },
   },
 })
 
-export const { setAuth, logout, loadAuthFromStorage } = authSlice.actions
+export const { setUser, clearUser, setLoading, hydrate } = authSlice.actions
+
+// Thunk to load auth from localStorage
+export const loadAuthFromStorage = () => (dispatch: AppDispatch) => {
+  if (typeof window !== 'undefined') {
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser)
+        dispatch(hydrate(user))
+      } catch (error) {
+        console.error('Failed to parse stored user:', error)
+        localStorage.removeItem('user')
+      }
+    }
+  }
+}
+
 export default authSlice.reducer

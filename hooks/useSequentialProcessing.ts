@@ -70,7 +70,6 @@ export function useSequentialProcessing(): UseSequentialProcessingReturn {
     abortControllerRef.current = new AbortController();
 
     try {
-      const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
       const response = await fetch(
@@ -79,8 +78,8 @@ export function useSequentialProcessing(): UseSequentialProcessingReturn {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           },
+          credentials: 'include',
           body: JSON.stringify({ userBankAccountId }),
           signal: abortControllerRef.current.signal,
         }

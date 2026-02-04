@@ -45,7 +45,7 @@ export function BankAccountSelector({ isOpen, onClose, onSelect, isLoading }: Ba
       setIsFetching(true);
       setError(null);
       const response = await transactionsApi.getUserBankAccounts();
-      const accounts = response.data.bankAccounts || response.data || [];
+      const accounts = response.data.data?.accounts || response.data.accounts || [];
       setBankAccounts(accounts);
 
       // Auto-select first account if only one exists
@@ -92,7 +92,7 @@ export function BankAccountSelector({ isOpen, onClose, onSelect, isLoading }: Ba
         <DialogHeader>
           <DialogTitle>Select Bank Account</DialogTitle>
           <DialogDescription>
-            Choose the bank account where these transactions should be recorded.
+            Choose the bank account where these transactions where carried out.
           </DialogDescription>
         </DialogHeader>
 

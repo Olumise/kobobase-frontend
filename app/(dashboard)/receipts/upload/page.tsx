@@ -4,10 +4,12 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, FileText, X, ChevronRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, FileText, X, ChevronRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
+import { receiptsApi } from '@/lib/api';
+import type { UploadReceiptResponse } from '@/lib/types/receipt';
 
 const steps = [
   { id: 1, label: 'Uploading receipt...' },
@@ -20,6 +22,7 @@ export default function UploadReceiptPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -41,22 +44,43 @@ export default function UploadReceiptPage() {
     if (!file) return;
 
     setIsProcessing(true);
+    setError(null);
 
-    // Simulate multi-stage process
-    // Step 1: Upload (0-33%)
-    setCurrentStep(1);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Step 1: Upload receipt
+      setCurrentStep(1);
+      const uploadResponse: UploadReceiptResponse = await receiptsApi.uploadReceipt(file);
 
-    // Step 2: Extraction (34-66%)
-    setCurrentStep(2);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 2: Extract text (OCR)
+      setCurrentStep(2);
+      const extractResponse = await receiptsApi.extractReceipt(uploadResponse.id);
 
-    // Step 3: Detection (67-100%)
-    setCurrentStep(3);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+      // Step 3: Detection complete
+      setCurrentStep(3);
 
-    // Complete
-    router.push('/receipts/rcp_001'); // Redirect to mock receipt detail
+      // Check if no transactions were detected
+      if (extractResponse.detection.transaction_count === 0) {
+        const errorMessage = extractResponse.detection.notes || 'No transactions found in the uploaded document. Please upload a receipt or bank statement with transaction details.';
+        setError(errorMessage);
+        setIsProcessing(false);
+        setCurrentStep(0);
+        return;
+      }
+
+      // Wait a moment to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Navigate to receipt detail page
+      router.push(`/receipts/${uploadResponse.id}`);
+    } catch (err: any) {
+      console.error('Upload/Extraction error:', err);
+
+      // Handle different error scenarios
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to process receipt';
+      setError(errorMessage);
+      setIsProcessing(false);
+      setCurrentStep(0);
+    }
   };
 
   return (
@@ -182,6 +206,25 @@ export default function UploadReceiptPage() {
             <p className="mt-8 text-sm text-center text-muted-foreground">
               Please wait while our AI analyzes your document...
             </p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && !isProcessing && (
+          <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-medium text-destructive mb-1">Upload Failed</h4>
+              <p className="text-sm text-destructive/90">{error}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setError(null)}
+              className="text-destructive hover:text-destructive"
+            >
+              Dismiss
+            </Button>
           </div>
         )}
       </div>

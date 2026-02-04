@@ -6,15 +6,18 @@ import { useAppSelector } from '@/store/hooks'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { isAuthenticated, token } = useAppSelector((state) => state.auth)
+  const { isAuthenticated } = useAppSelector((state) => state.auth)
 
   useEffect(() => {
-    if (!isAuthenticated || !token) {
+    // If not authenticated, redirect to login
+    // The API interceptor will also redirect on 401, but this handles the initial load
+    if (!isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, token, router])
+  }, [isAuthenticated, router])
 
-  if (!isAuthenticated || !token) {
+  // Only render children if authenticated
+  if (!isAuthenticated) {
     return null
   }
 

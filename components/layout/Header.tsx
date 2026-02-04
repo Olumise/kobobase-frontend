@@ -20,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { clearUser } from '@/store/slices/authSlice';
+import { logout as logoutUser } from '@/lib/auth';
 
 export function Header() {
   const pathname = usePathname();
@@ -28,9 +29,20 @@ export function Header() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // Call backend to clear session cookies
+      await logoutUser();
+      // Clear user from Redux store
+      dispatch(clearUser());
+      // Redirect to login
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still clear local state and redirect even if API call fails
+      dispatch(clearUser());
+      router.push('/login');
+    }
   };
 
   const getPageTitle = (path: string) => {

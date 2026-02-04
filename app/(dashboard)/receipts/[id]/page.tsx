@@ -10,7 +10,8 @@ import {
   Zap,
   Trash2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { sampleReceipts } from '@/lib/mockData';
@@ -25,6 +26,9 @@ import { ReceiptPreview } from "@/components/receipts/ReceiptPreview";
 import { receiptsApi } from '@/lib/api';
 import { useSequentialProcessing } from '@/hooks/useSequentialProcessing';
 import { BankAccountSelector } from '@/components/receipts/BankAccountSelector';
+import { ReprocessWarningDialog } from '@/components/receipts/ReprocessWarningDialog';
+import { DeleteReceiptDialog } from '@/components/receipts/DeleteReceiptDialog';
+import type { Transaction, TransactionExtraction, BatchSession } from '@/lib/types/transaction';
 
 interface Receipt {
   id: string;
@@ -45,8 +49,8 @@ interface Receipt {
     ocrConfidence?: number;
     processingTime?: number;
   };
-  transactions: any[];
-  batchSessions: any[];
+  transactions: Transaction[];
+  batchSessions: BatchSession[];
 }
 
 export default function ReceiptDetailsPage() {
@@ -57,6 +61,19 @@ export default function ReceiptDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBankSelector, setShowBankSelector] = useState(false);
+
+  // Session state management
+  const [activeBatchSession, setActiveBatchSession] = useState<BatchSession | null>(null);
+  const [buttonState, setButtonState] = useState<'process' | 'continue' | 'reprocess'>('process');
+  const [showReprocessWarning, setShowReprocessWarning] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(false);
+
+  // Delete state management
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Extraction state management
+  const [isExtracting, setIsExtracting] = useState(false);
 
   // SSE Progress Hook
   const {
@@ -108,8 +125,75 @@ export default function ReceiptDetailsPage() {
     }
   }, [params.id]);
 
-  const handleInitiateProcessing = async () => {
-    // Show bank account selector
+  // Check for existing batch session and determine button state
+  useEffect(() => {
+    const checkSessionState = async () => {
+      if (!receipt?.id) return;
+
+      try {
+        setIsCheckingSession(true);
+
+        // Find the most recent in-progress batch session
+        const inProgressSession = receipt.batchSessions
+          ?.filter((session: BatchSession) => session.status === 'in_progress')
+          .sort((a: BatchSession, b: BatchSession) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+
+        setActiveBatchSession(inProgressSession || null);
+
+        // Determine button state
+        if (receipt.transactions.length > 0) {
+          // Has approved transactions - show re-process with warning
+          setButtonState('reprocess');
+        } else if (
+          inProgressSession?.extractedData?.transaction_results &&
+          inProgressSession.extractedData.transaction_results.length > 0
+        ) {
+          // Has extracted data, no approved - show continue
+          setButtonState('continue');
+        } else {
+          // No session or empty - show process
+          setButtonState('process');
+        }
+      } catch (error) {
+        console.error('Error checking session state:', error);
+        setButtonState('process'); // Default to safe state
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSessionState();
+  }, [receipt?.id, receipt?.batchSessions, receipt?.transactions]);
+
+  const handleProcessButtonClick = () => {
+    if (!receipt?.id) return;
+
+    switch (buttonState) {
+      case 'continue':
+        // Navigate directly to existing session
+        if (activeBatchSession) {
+          router.push(`/transactions/sequential/${activeBatchSession.id}`);
+        }
+        break;
+
+      case 'reprocess':
+        // Show warning dialog
+        setShowReprocessWarning(true);
+        break;
+
+      case 'process':
+      default:
+        // Show bank selector to start new processing
+        setShowBankSelector(true);
+        break;
+    }
+  };
+
+  const handleReprocessConfirm = async () => {
+    // User confirmed deletion - proceed with bank selector
+    setShowReprocessWarning(false);
     setShowBankSelector(true);
   };
 
@@ -121,6 +205,47 @@ export default function ReceiptDetailsPage() {
 
     // Start the SSE processing
     await initiateProcessing(receipt.id, bankAccountId);
+  };
+
+  const handleDeleteReceipt = async () => {
+    if (!receipt?.id) return;
+
+    try {
+      setIsDeleting(true);
+      await receiptsApi.deleteReceipt(receipt.id);
+
+      // Close dialog and navigate back to receipts list
+      setShowDeleteDialog(false);
+      router.push('/receipts');
+    } catch (error: any) {
+      console.error('Error deleting receipt:', error);
+      // You could add a toast notification here
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const handleExtractReceipt = async () => {
+    if (!receipt?.id) return;
+
+    try {
+      setIsExtracting(true);
+      const extractResponse = await receiptsApi.extractReceipt(receipt.id);
+
+      // Check if no transactions were detected
+      if (extractResponse.detection.transaction_count === 0) {
+        // Show error or redirect with error message
+        console.error('No transactions found:', extractResponse.detection.notes);
+        setIsExtracting(false);
+        return;
+      }
+
+      // Reload the page to show updated receipt data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error extracting receipt:', error);
+      setIsExtracting(false);
+    }
   };
 
   // Handle processing completion
@@ -153,6 +278,8 @@ export default function ReceiptDetailsPage() {
 
   // Error state
   if (error || !receipt) {
+    const receiptId = params.id as string;
+
     return (
       <div className="h-[calc(100vh-8rem)] flex flex-col">
         <div className="flex items-center gap-4 mb-6">
@@ -166,52 +293,142 @@ export default function ReceiptDetailsPage() {
               <ArrowLeft size={20} />
             </Link>
           </Button>
-          <h1 className="text-xl font-semibold text-foreground">Receipt Not Found</h1>
+          <h1 className="text-xl font-semibold text-foreground">Unable to Load Receipt</h1>
         </div>
         <Card className="flex-1 flex items-center justify-center">
-          <CardContent className="text-center py-12">
+          <CardContent className="text-center py-12 max-w-2xl">
             <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Unable to Load Receipt</h2>
             <p className="text-muted-foreground mb-6">
               {error || 'The receipt you are looking for does not exist.'}
             </p>
-            <Button asChild>
-              <Link href="/receipts">
-                <ArrowLeft size={16} />
-                Back to Receipts
-              </Link>
-            </Button>
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="outline" asChild>
+                <Link href="/receipts">
+                  <ArrowLeft size={16} />
+                  Back to Receipts
+                </Link>
+              </Button>
+              {receiptId && (
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    try {
+                      setIsDeleting(true);
+                      await receiptsApi.deleteReceipt(receiptId);
+                      router.push('/receipts');
+                    } catch (err) {
+                      console.error('Error deleting receipt:', err);
+                      setIsDeleting(false);
+                    }
+                  }}
+                  disabled={isDeleting}
+                >
+                  <Trash2 size={16} />
+                  {isDeleting ? 'Deleting...' : 'Delete Receipt'}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog for error state */}
+        <DeleteReceiptDialog
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          onConfirm={handleDeleteReceipt}
+          transactionCount={0}
+          isDeleting={isDeleting}
+        />
       </div>
     );
   }
+
+  // Check if receipt is pending and needs extraction
+  const needsExtraction = receipt.processingStatus === 'pending' && !receipt.rawOcrText;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="rounded-full h-10 w-10" 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full h-10 w-10"
           asChild
         >
           <Link href="/receipts">
             <ArrowLeft size={20} />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
             Receipt Details
             <Badge variant="secondary" className="font-mono text-xs">
-              #{receipt.id}
+              #{receipt.id.slice(0, 8)}...
             </Badge>
           </h1>
         </div>
+        <Badge
+          variant={
+            receipt.processingStatus === 'processed' ? 'default' :
+            receipt.processingStatus === 'processing' ? 'secondary' :
+            receipt.processingStatus === 'failed' ? 'destructive' :
+            'outline'
+          }
+          className={cn(
+            "capitalize",
+            receipt.processingStatus === 'processed' && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+            receipt.processingStatus === 'processing' && "bg-blue-500/10 text-blue-600 border-blue-500/20",
+            receipt.processingStatus === 'pending' && "bg-amber-500/10 text-amber-600 border-amber-500/20"
+          )}
+        >
+          {receipt.processingStatus}
+        </Badge>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6 h-full overflow-hidden">
+      {/* Pending Extraction State - Simplified View */}
+      {needsExtraction ? (
+        <Card className="flex-1 flex items-center justify-center">
+          <CardContent className="text-center py-12 max-w-lg">
+            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FileText className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-2xl font-semibold mb-3">Receipt Awaiting Extraction</h2>
+            <p className="text-muted-foreground mb-8">
+              This receipt has been uploaded but hasn't been processed yet. Extract the receipt to analyze and detect transactions from the document.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isDeleting}
+              >
+                <Trash2 size={16} />
+                Delete Receipt
+              </Button>
+              <Button
+                size="lg"
+                onClick={handleExtractReceipt}
+                disabled={isExtracting}
+              >
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Extract Receipt
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6 h-full overflow-hidden">
         {/* LEFT: Receipt Preview */}
         <div className="lg:col-span-2 bg-zinc-900 rounded-xl overflow-hidden shadow-sm relative flex flex-col gap-6">
           <ReceiptPreview
@@ -256,95 +473,109 @@ export default function ReceiptDetailsPage() {
 
         {/* RIGHT: Extraction Results */}
         <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-1">
-         
 
-          {/* Status Card */}
-          <Card className="shadow-sm">
-            <CardContent className="">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    {/* Placeholder for optional icons/labels */}
-                  </div>
-                  <h2 className="text-2xl font-semibold tracking-tighter text-foreground">
-                    {receipt.expectedTransactions} transactions detected
-                  </h2>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-medium">
-                     {receipt.processingStatus === 'PROCESSED' || receipt.processingStatus === 'processed' ? (
-                       <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
-                         <CheckCircle2 size={12} /> Extraction complete
-                       </Badge>
-                     ) : (
-                       <Badge variant="outline" className="text-amber-600 bg-amber-500/5 border-amber-500/10 gap-1 px-2">
-                         <Clock size={12} /> {receipt.processingStatus?.replace(/_/g, ' ') || 'Processing'}
-                       </Badge>
-                     )}
-                     {receipt.extractionMetadata?.processingTime && (
-                       <>
-                         <span>•</span>
-                         <span className="flex items-center gap-1"><Clock size={12} /> {receipt.extractionMetadata.processingTime}s</span>
-                       </>
-                     )}
-                  </div>
-                </div>
-
-                {receipt.extractionMetadata?.ocrConfidence !== undefined && (
-                  <div className="text-right w-full sm:w-auto">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">OCR Confidence</p>
-                    <div className="flex items-center justify-end gap-2 mb-2">
-                      <span className="text-2xl font-bold text-primary">{receipt.extractionMetadata.ocrConfidence}%</span>
+          {/* Status Card - Only show when batch session exists with extracted transactions */}
+          {activeBatchSession?.extractedData?.transaction_results && (
+            <Card className="shadow-sm">
+              <CardContent className="">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      {/* Placeholder for optional icons/labels */}
                     </div>
-                    <Progress value={receipt.extractionMetadata.ocrConfidence} className="h-2 w-32 ml-auto" />
+                    <h2 className="text-2xl font-semibold tracking-tighter text-foreground">
+                      {activeBatchSession.extractedData.transaction_results.length} transactions detected
+                    </h2>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-medium">
+                      <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
+                        <CheckCircle2 size={12} /> Extraction complete
+                      </Badge>
+                      {receipt.extractionMetadata?.processingTime && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1"><Clock size={12} /> {receipt.extractionMetadata.processingTime}s</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
+                  {receipt.extractionMetadata?.ocrConfidence !== undefined && (
+                    <div className="text-right w-full sm:w-auto">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">OCR Confidence</p>
+                      <div className="flex items-center justify-end gap-2 mb-2">
+                        <span className="text-2xl font-bold text-primary">{receipt.extractionMetadata.ocrConfidence}%</span>
+                      </div>
+                      <Progress value={receipt.extractionMetadata.ocrConfidence} className="h-2 w-32 ml-auto" />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Transaction Preview */}
           <Card className="flex-1 flex flex-col overflow-hidden shadow-sm">
             <CardHeader className="border-b">
-              <CardTitle className="text-lg font-semibold">Approved Transactions</CardTitle>
+              <CardTitle className="text-lg font-semibold">Extracted Transactions</CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">
-              {receipt.transactions && receipt.transactions.length > 0 ? (
+              {activeBatchSession?.extractedData?.transaction_results &&
+               activeBatchSession.extractedData.transaction_results.length > 0 ? (
                 <ScrollArea className="h-full max-h-100">
                   <div className="divide-y divide-border">
-                    {receipt.transactions.map((txn: any, index: number) => (
-                      <div
-                        key={txn.id || index}
-                        className={cn(
-                          "flex items-center justify-between p-4 hover:bg-muted/30 transition-colors",
-                          index % 2 !== 0 && "bg-muted/5"
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs font-mono text-muted-foreground w-6">#{index + 1}</span>
-                          {txn.aiConfidence && (
-                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-8 px-2 font-mono">
-                              {Math.round(txn.aiConfidence * 100)}%
-                            </Badge>
+                    {activeBatchSession.extractedData.transaction_results.map((txn: TransactionExtraction, index: number) => {
+                      // Show all transactions - completed ones and those needing clarification
+                      const isComplete = txn.transaction !== null;
+
+                      return (
+                        <div
+                          key={index}
+                          className={cn(
+                            "flex items-center justify-between p-4 hover:bg-muted/30 transition-colors",
+                            index % 2 !== 0 && "bg-muted/5",
+                            !isComplete && "opacity-60 bg-amber-50/30 dark:bg-amber-950/10"
                           )}
-                          <div>
-                            <p className="font-medium text-foreground">{txn.description || txn.merchant || 'Transaction'}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {txn.transactionDate ? new Date(txn.transactionDate).toLocaleDateString() : 'N/A'}
-                            </p>
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs font-mono text-muted-foreground w-6">#{index + 1}</span>
+                            {txn.confidence_score && (
+                              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-8 px-2 font-mono">
+                                {Math.round(txn.confidence_score * 100)}%
+                              </Badge>
+                            )}
+                            {!isComplete && (
+                              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 h-8 px-2">
+                                Needs Clarification
+                              </Badge>
+                            )}
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {isComplete
+                                  ? (txn.transaction?.description || txn.transaction?.receiver_name || 'Transaction')
+                                  : 'Transaction requires clarification'
+                                }
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {isComplete && txn.transaction?.time_sent
+                                  ? new Date(txn.transaction.time_sent).toLocaleDateString()
+                                  : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="font-semibold text-foreground">
+                            {isComplete ? formatCurrency(txn.transaction?.amount || 0) : '-'}
                           </div>
                         </div>
-                        <div className="font-semibold text-foreground">
-                          {formatCurrency(txn.amount || 0)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               ) : (
                 <div className="flex items-center justify-center h-full min-h-50 text-center p-8">
                   <div>
-                    <p className="text-muted-foreground mb-2">No Approved Transaction yet</p>
+                    <p className="text-muted-foreground mb-2">No Extracted Transactions</p>
                     <p className="text-xs text-muted-foreground">
-                      Initiate processing to extract approved transactions from this receipt
+                      Initiate processing to extract transactions from this receipt
                     </p>
                   </div>
                 </div>
@@ -356,22 +587,57 @@ export default function ReceiptDetailsPage() {
           <div className="flex items-center gap-4 mt-auto pt-2">
             <Button
               variant="outline"
-              onClick={() => {}}
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={isDeleting}
             >
               <Trash2 size={18} />
               <span className="hidden sm:inline">Delete Receipt</span>
             </Button>
-            <Button
-              className='flex-1'
-              onClick={handleInitiateProcessing}
-              disabled={!receipt.expectedTransactions || receipt.expectedTransactions < 1}
-            >
-              <Zap className="fill-current w-5 h-5" />
-              Initiate Transaction Processing
-            </Button>
+            {receipt.processingStatus === 'pending' && !receipt.rawOcrText ? (
+              <Button
+                className='flex-1'
+                onClick={handleExtractReceipt}
+                disabled={isExtracting}
+              >
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Extract Receipt
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                className='flex-1'
+                onClick={handleProcessButtonClick}
+                disabled={
+                  !receipt.expectedTransactions ||
+                  receipt.expectedTransactions < 1 ||
+                  isCheckingSession ||
+                  isProcessing
+                }
+              >
+                <Zap className="fill-current w-5 h-5" />
+                {isCheckingSession ? (
+                  'Checking...'
+                ) : buttonState === 'continue' && activeBatchSession ? (
+                  `Continue Approval (${activeBatchSession.currentIndex || 0} of ${activeBatchSession.totalExpected})`
+                ) : buttonState === 'reprocess' ? (
+                  'Re-process Receipt'
+                ) : (
+                  'Initiate Transaction Processing'
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>
+      )}
 
       {/* Bank Account Selector Modal */}
       <BankAccountSelector
@@ -379,6 +645,24 @@ export default function ReceiptDetailsPage() {
         onClose={() => setShowBankSelector(false)}
         onSelect={handleBankAccountSelected}
         isLoading={isProcessing}
+      />
+
+      {/* Re-process Warning Dialog */}
+      <ReprocessWarningDialog
+        isOpen={showReprocessWarning}
+        onClose={() => setShowReprocessWarning(false)}
+        onConfirm={handleReprocessConfirm}
+        transactionCount={receipt?.transactions?.length || 0}
+        isProcessing={isProcessing}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteReceiptDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteReceipt}
+        transactionCount={receipt?.transactions?.length || 0}
+        isDeleting={isDeleting}
       />
 
       {/* Full Screen Loading Modal with SSE Progress */}
