@@ -43,6 +43,7 @@ export default function SequentialProcessingPage() {
 	const [batchSession, setBatchSession] = useState<BatchSession | null>(null);
 	const [transactions, setTransactions] = useState<ReviewTransaction[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [isApproving, setIsApproving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	// Fetch batch session data
@@ -78,11 +79,12 @@ export default function SequentialProcessingPage() {
 
 	const currentTxn = transactions[currentIndex];
 
-	const handleApprove = async () => {
+	const handleApprove = async (edits?: any) => {
 		if (!batchSession?.id) return;
 
 		try {
-			await transactionsApi.approveAndNext(batchSession.id);
+			setIsApproving(true);
+			await transactionsApi.approveAndNext(batchSession.id, edits);
 
 			if (currentIndex < transactions.length - 1) {
 				setCurrentIndex((prev) => prev + 1);
@@ -92,6 +94,8 @@ export default function SequentialProcessingPage() {
 			}
 		} catch (err: any) {
 			console.error("Error approving transaction:", err);
+		} finally {
+			setIsApproving(false);
 		}
 	};
 
@@ -217,6 +221,7 @@ export default function SequentialProcessingPage() {
 							onApprove={handleApprove}
 							onSkip={() => {}}
 							onClarify={() => setIsChatOpen(true)}
+							isApproving={isApproving}
 						/>
 					</motion.div>
 				</AnimatePresence>

@@ -11,7 +11,9 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
-  FileText
+  FileText,
+  MoreVertical,
+  AlertTriangle
 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { sampleReceipts } from '@/lib/mockData';
@@ -22,13 +24,19 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ReceiptPreview } from "@/components/receipts/ReceiptPreview";
 import { receiptsApi } from '@/lib/api';
 import { useSequentialProcessing } from '@/hooks/useSequentialProcessing';
 import { BankAccountSelector } from '@/components/receipts/BankAccountSelector';
 import { ReprocessWarningDialog } from '@/components/receipts/ReprocessWarningDialog';
 import { DeleteReceiptDialog } from '@/components/receipts/DeleteReceiptDialog';
-import type { Transaction, TransactionExtraction, BatchSession } from '@/lib/types/transaction';
+import type { Transaction, BatchSession } from '@/lib/types/transaction';
 
 interface Receipt {
   id: string;
@@ -64,7 +72,7 @@ export default function ReceiptDetailsPage() {
 
   // Session state management
   const [activeBatchSession, setActiveBatchSession] = useState<BatchSession | null>(null);
-  const [buttonState, setButtonState] = useState<'process' | 'continue' | 'reprocess'>('process');
+  const [buttonState, setButtonState] = useState<'process' | 'continue'>('process');
   const [showReprocessWarning, setShowReprocessWarning] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(false);
 
@@ -143,14 +151,12 @@ export default function ReceiptDetailsPage() {
         setActiveBatchSession(inProgressSession || null);
 
         // Determine button state
-        if (receipt.transactions.length > 0) {
-          // Has approved transactions - show re-process with warning
-          setButtonState('reprocess');
-        } else if (
+        // Priority 1: Check for in-progress session first
+        if (
           inProgressSession?.extractedData?.transaction_results &&
           inProgressSession.extractedData.transaction_results.length > 0
         ) {
-          // Has extracted data, no approved - show continue
+          // Has active session - allow continuation
           setButtonState('continue');
         } else {
           // No session or empty - show process
@@ -178,17 +184,16 @@ export default function ReceiptDetailsPage() {
         }
         break;
 
-      case 'reprocess':
-        // Show warning dialog
-        setShowReprocessWarning(true);
-        break;
-
       case 'process':
       default:
         // Show bank selector to start new processing
         setShowBankSelector(true);
         break;
     }
+  };
+
+  const handleReprocessClick = () => {
+    setShowReprocessWarning(true);
   };
 
   const handleReprocessConfirm = async () => {
@@ -474,8 +479,8 @@ export default function ReceiptDetailsPage() {
         {/* RIGHT: Extraction Results */}
         <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-1">
 
-          {/* Status Card - Only show when batch session exists with extracted transactions */}
-          {activeBatchSession?.extractedData?.transaction_results && (
+          {/* Status Card - Show session progress or approved count */}
+          {(activeBatchSession?.extractedData?.transaction_results || (receipt.transactions && receipt.transactions.length > 0)) && (
             <Card className="shadow-sm">
               <CardContent className="">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -484,12 +489,26 @@ export default function ReceiptDetailsPage() {
                       {/* Placeholder for optional icons/labels */}
                     </div>
                     <h2 className="text-2xl font-semibold tracking-tighter text-foreground">
-                      {activeBatchSession.extractedData.transaction_results.length} transactions detected
+                      {activeBatchSession?.extractedData?.transaction_results ? (
+                        <>
+                          {activeBatchSession.extractedData.transaction_results.length} transaction{activeBatchSession.extractedData.transaction_results.length !== 1 ? 's' : ''} detected
+                        </>
+                      ) : (
+                        <>
+                          {receipt.transactions.length} approved transaction{receipt.transactions.length !== 1 ? 's' : ''}
+                        </>
+                      )}
                     </h2>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-medium">
-                      <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
-                        <CheckCircle2 size={12} /> Extraction complete
-                      </Badge>
+                      {activeBatchSession?.extractedData?.transaction_results ? (
+                        <Badge variant="outline" className="text-blue-600 bg-blue-500/5 border-blue-500/10 gap-1 px-2">
+                          <Loader2 size={12} className="animate-spin" /> In Progress ({activeBatchSession.totalProcessed || 0} of {activeBatchSession.totalExpected} approved)
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
+                          <CheckCircle2 size={12} /> Approved
+                        </Badge>
+                      )}
                       {receipt.extractionMetadata?.processingTime && (
                         <>
                           <span>•</span>
@@ -513,57 +532,39 @@ export default function ReceiptDetailsPage() {
             </Card>
           )}
 
-          {/* Transaction Preview */}
+          {/* Approved Transactions */}
           <Card className="flex-1 flex flex-col overflow-hidden shadow-sm">
             <CardHeader className="border-b">
-              <CardTitle className="text-lg font-semibold">Extracted Transactions</CardTitle>
+              <CardTitle className="text-lg font-semibold">Approved Transactions</CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">
-              {activeBatchSession?.extractedData?.transaction_results &&
-               activeBatchSession.extractedData.transaction_results.length > 0 ? (
+              {receipt.transactions && receipt.transactions.length > 0 ? (
                 <ScrollArea className="h-full max-h-100">
                   <div className="divide-y divide-border">
-                    {activeBatchSession.extractedData.transaction_results.map((txn: TransactionExtraction, index: number) => {
-                      // Show all transactions - completed ones and those needing clarification
-                      const isComplete = txn.transaction !== null;
-
+                    {receipt.transactions.map((txn: Transaction, index: number) => {
                       return (
                         <div
-                          key={index}
+                          key={txn.id}
                           className={cn(
                             "flex items-center justify-between p-4 hover:bg-muted/30 transition-colors",
-                            index % 2 !== 0 && "bg-muted/5",
-                            !isComplete && "opacity-60 bg-amber-50/30 dark:bg-amber-950/10"
+                            index % 2 !== 0 && "bg-muted/5"
                           )}
                         >
                           <div className="flex items-center gap-4">
                             <span className="text-xs font-mono text-muted-foreground w-6">#{index + 1}</span>
-                            {txn.confidence_score && (
-                              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-8 px-2 font-mono">
-                                {Math.round(txn.confidence_score * 100)}%
-                              </Badge>
-                            )}
-                            {!isComplete && (
-                              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 h-8 px-2">
-                                Needs Clarification
-                              </Badge>
-                            )}
                             <div>
                               <p className="font-medium text-foreground">
-                                {isComplete
-                                  ? (txn.transaction?.description || txn.transaction?.receiver_name || 'Transaction')
-                                  : 'Transaction requires clarification'
-                                }
+                                {txn.description || txn.contact?.name || 'Transaction'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {isComplete && txn.transaction?.time_sent
-                                  ? new Date(txn.transaction.time_sent).toLocaleDateString()
+                                {txn.transactionDate
+                                  ? new Date(txn.transactionDate).toLocaleDateString()
                                   : 'N/A'}
                               </p>
                             </div>
                           </div>
                           <div className="font-semibold text-foreground">
-                            {isComplete ? formatCurrency(txn.transaction?.amount || 0) : '-'}
+                            {formatCurrency(txn.amount || 0)}
                           </div>
                         </div>
                       );
@@ -573,9 +574,9 @@ export default function ReceiptDetailsPage() {
               ) : (
                 <div className="flex items-center justify-center h-full min-h-50 text-center p-8">
                   <div>
-                    <p className="text-muted-foreground mb-2">No Extracted Transactions</p>
+                    <p className="text-muted-foreground mb-2">No Approved Transactions Yet</p>
                     <p className="text-xs text-muted-foreground">
-                      Initiate processing to extract transactions from this receipt
+                      Initiate processing to extract and approve transactions from this receipt
                     </p>
                   </div>
                 </div>
@@ -593,6 +594,27 @@ export default function ReceiptDetailsPage() {
               <Trash2 size={18} />
               <span className="hidden sm:inline">Delete Receipt</span>
             </Button>
+
+            {/* Hamburger Menu - Show when there are approved transactions or an active session */}
+            {(receipt.transactions.length > 0 || activeBatchSession) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical size={18} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleReprocessClick}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <AlertTriangle size={16} className="mr-2" />
+                    Re-process Receipt
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {receipt.processingStatus === 'pending' && !receipt.rawOcrText ? (
               <Button
                 className='flex-1'
@@ -627,8 +649,6 @@ export default function ReceiptDetailsPage() {
                   'Checking...'
                 ) : buttonState === 'continue' && activeBatchSession ? (
                   `Continue Approval (${activeBatchSession.currentIndex || 0} of ${activeBatchSession.totalExpected})`
-                ) : buttonState === 'reprocess' ? (
-                  'Re-process Receipt'
                 ) : (
                   'Initiate Transaction Processing'
                 )}

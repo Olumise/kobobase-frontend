@@ -9,6 +9,7 @@ import {
 	ChevronDown,
 	Sparkles,
 	Calendar as CalendarIcon,
+	Loader2,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -37,19 +38,39 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { contactsApi, categoriesApi } from "@/lib/api";
+import { contactsApi, categoriesApi, transactionsApi } from "@/lib/api";
 
 export type TransactionState =
 	| "READY"
 	| "CLARIFICATION_NEEDED"
 	| "NEEDS_CONFIRMATION";
 
+interface BankAccount {
+	id: string;
+	accountName: string;
+	accountNumber: string;
+	bankName: string;
+	currency: string;
+}
+
+interface TransactionEdits {
+	categoryId?: string;
+	contactId?: string;
+	userBankAccountId?: string;
+	toBankAccountId?: string;
+	amount?: number;
+	description?: string;
+	transactionDate?: string;
+	paymentMethod?: string;
+}
+
 interface TransactionReviewCardProps {
 	transaction: any;
 	state: TransactionState;
-	onApprove: () => void;
+	onApprove: (edits?: TransactionEdits) => void;
 	onSkip: () => void;
 	onClarify: () => void;
+	isApproving?: boolean;
 }
 
 const paymentMethods = [
@@ -64,12 +85,15 @@ export function TransactionReviewCard({
 	onApprove,
 	onSkip,
 	onClarify,
+	isApproving = false,
 }: TransactionReviewCardProps) {
 
 	const [contacts, setContacts] = useState<any[]>([]);
 	const [categories, setCategories] = useState<any[]>([]);
 	const [isLoadingContacts, setIsLoadingContacts] = useState(false);
 	const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+	const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+	const [isLoadingBankAccounts, setIsLoadingBankAccounts] = useState(false);
 
 	const [description, setDescription] = useState<string>(
 		transaction?.transaction?.description || ""
@@ -87,6 +111,12 @@ export function TransactionReviewCard({
 	);
 	const [selectedContact, setSelectedContact] = useState<string>(
 		transaction?.enrichment_data?.contact_id || ""
+	);
+	const [selectedUserBankAccount, setSelectedUserBankAccount] = useState<string>(
+		transaction?.enrichment_data?.user_bank_account_id || ""
+	);
+	const [selectedToBankAccount, setSelectedToBankAccount] = useState<string>(
+		transaction?.enrichment_data?.to_bank_account_id || ""
 	);
 
 	useEffect(() => {
@@ -114,8 +144,23 @@ export function TransactionReviewCard({
 			}
 		};
 
+		const fetchBankAccounts = async () => {
+			setIsLoadingBankAccounts(true);
+			try {
+				const response = await transactionsApi.getUserBankAccounts();
+				const accounts = response.data.data?.accounts || response.data.accounts || [];
+				setBankAccounts(accounts);
+			} catch (error) {
+				console.error("Failed to fetch bank accounts:", error);
+				setBankAccounts([]);
+			} finally {
+				setIsLoadingBankAccounts(false);
+			}
+		};
+
 		fetchContacts();
 		fetchCategories();
+		fetchBankAccounts();
 	}, []);
 
 	useEffect(() => {
@@ -148,6 +193,18 @@ export function TransactionReviewCard({
 		}
 	}, [transaction?.enrichment_data?.contact_id]);
 
+	useEffect(() => {
+		if (transaction?.enrichment_data?.user_bank_account_id) {
+			setSelectedUserBankAccount(transaction.enrichment_data.user_bank_account_id);
+		}
+	}, [transaction?.enrichment_data?.user_bank_account_id]);
+
+	useEffect(() => {
+		if (transaction?.enrichment_data?.to_bank_account_id) {
+			setSelectedToBankAccount(transaction.enrichment_data.to_bank_account_id);
+		}
+	}, [transaction?.enrichment_data?.to_bank_account_id]);
+
 	const getHeaderConfig = () => {
 		switch (state) {
 			case "READY":
@@ -177,6 +234,49 @@ export function TransactionReviewCard({
 	const config = getHeaderConfig();
 	const Icon = config.icon;
 
+	const collectEdits = (): TransactionEdits => {
+		const edits: TransactionEdits = {};
+
+		// Only include fields that have been changed from original values
+		if (description !== (transaction?.transaction?.description || "")) {
+			edits.description = description;
+		}
+
+		if (selectedCategory !== (transaction?.enrichment_data?.category_id || "")) {
+			edits.categoryId = selectedCategory;
+		}
+
+		if (selectedContact !== (transaction?.enrichment_data?.contact_id || "")) {
+			edits.contactId = selectedContact;
+		}
+
+		if (selectedPaymentMethod !== (transaction?.transaction?.payment_method || "")) {
+			edits.paymentMethod = selectedPaymentMethod;
+		}
+
+		if (selectedUserBankAccount !== (transaction?.enrichment_data?.user_bank_account_id || "")) {
+			edits.userBankAccountId = selectedUserBankAccount;
+		}
+
+		if (selectedToBankAccount !== (transaction?.enrichment_data?.to_bank_account_id || "")) {
+			edits.toBankAccountId = selectedToBankAccount || undefined;
+		}
+
+		// Handle date conversion to ISO string
+		if (selectedDate) {
+			const originalDate = transaction?.transaction?.time_sent
+				? new Date(transaction.transaction.time_sent).toISOString()
+				: null;
+			const newDate = selectedDate.toISOString();
+
+			if (newDate !== originalDate) {
+				edits.transactionDate = newDate;
+			}
+		}
+
+		return edits;
+	};
+
 	return (
 		<div className="w-full max-w-2xl mx-auto space-y-6">
 			{/* Dynamic Header Badge */}
@@ -205,13 +305,29 @@ export function TransactionReviewCard({
 								className="text-amber-600 flex-shrink-0 mt-0.5"
 								size={18}
 							/>
-							<div>
+							<div className="flex-1">
 								<h4 className="font-medium text-amber-800 text-sm">
-									Additional Clarification needed
+									Please provide the following information:
 								</h4>
-								<p className="text-amber-700 text-xs mt-1">
-									{transaction?.notes}
-								</p>
+								{/* Show questions prominently */}
+								{transaction?.questions && transaction.questions.length > 0 && (
+									<ul className="mt-2 space-y-1">
+										{transaction.questions.map((q: string, i: number) => (
+											<li key={i} className="text-amber-700 text-xs">• {q}</li>
+										))}
+									</ul>
+								)}
+								{/* Optionally show notes as secondary info */}
+								{transaction?.notes && (
+									<details className="mt-2">
+										<summary className="text-xs text-amber-600 cursor-pointer hover:text-amber-700">
+											Technical notes
+										</summary>
+										<p className="text-amber-700 text-xs mt-1">
+											{transaction.notes}
+										</p>
+									</details>
+								)}
 							</div>
 						</motion.div>
 					)}
@@ -380,6 +496,65 @@ export function TransactionReviewCard({
 									</SelectContent>
 								</Select>
 							</div>
+
+							<div className="space-y-2">
+								<label className="text-sm font-medium text-muted-foreground">
+									Source Account
+								</label>
+								<Select
+									value={selectedUserBankAccount}
+									onValueChange={setSelectedUserBankAccount}>
+									<SelectTrigger className="bg-background w-full">
+										<SelectValue
+											placeholder={
+												isLoadingBankAccounts
+													? "Loading accounts..."
+													: "Select source account"
+											}
+										/>
+									</SelectTrigger>
+									<SelectContent>
+										{bankAccounts?.map((account) => (
+											<SelectItem
+												key={account.id}
+												value={account.id}>
+												{account.accountName} - {account.bankName} ({account.accountNumber.slice(-4)})
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							{transaction?.enrichment_data?.is_self_transaction && (
+								<div className="space-y-2">
+									<label className="text-sm font-medium text-muted-foreground">
+										Destination Account
+									</label>
+									<Select
+										value={selectedToBankAccount || "NONE"}
+										onValueChange={(value) => setSelectedToBankAccount(value === "NONE" ? "" : value)}>
+										<SelectTrigger className="bg-background w-full">
+											<SelectValue
+												placeholder={
+													isLoadingBankAccounts
+														? "Loading accounts..."
+														: "Select destination account"
+												}
+											/>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="NONE">None</SelectItem>
+											{bankAccounts?.map((account) => (
+												<SelectItem
+													key={account.id}
+													value={account.id}>
+													{account.accountName} - {account.bankName} ({account.accountNumber.slice(-4)})
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+							)}
 						</div>
 					)}
 				</CardContent>
@@ -407,15 +582,30 @@ export function TransactionReviewCard({
 						)}
 
 						<Button
-							onClick={onApprove}
-							disabled={state === "CLARIFICATION_NEEDED"}
+							onClick={() => {
+								const edits = collectEdits();
+								onApprove(edits);
+							}}
+							disabled={state === "CLARIFICATION_NEEDED" || isApproving}
 							size="lg"
 							className="flex-1 sm:flex-none px-8 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-lg transition-all">
-							<Check
-								size={18}
-								className="mr-2"
-							/>
-							Approve & Next
+							{isApproving ? (
+								<>
+									<Loader2
+										size={18}
+										className="mr-2 animate-spin"
+									/>
+									Approving...
+								</>
+							) : (
+								<>
+									<Check
+										size={18}
+										className="mr-2"
+									/>
+									Approve & Next
+								</>
+							)}
 						</Button>
 					</div>
 				</CardFooter>
