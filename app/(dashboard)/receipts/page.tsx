@@ -123,8 +123,20 @@ export default function ReceiptsPage() {
     return getStatusFromProcessing(r.processingStatus) === filter.toUpperCase();
   });
 
-  const getTotalAmount = (receipt: Receipt): number => {
-    return receipt.transactions.reduce((sum, txn) => sum + txn.amount, 0);
+  const getTransactionTotals = (receipt: Receipt): { income: number; expenses: number } => {
+    return receipt.transactions.reduce(
+      (totals, txn) => {
+        const amount = Number(txn.amount);
+        if (txn.transactionType === 'INCOME') {
+          totals.income += amount;
+        } else if (txn.transactionType === 'EXPENSE') {
+          totals.expenses += amount;
+        }
+        // TRANSFER transactions are not included in either total
+        return totals;
+      },
+      { income: 0, expenses: 0 }
+    );
   };
 
   const getProcessedCount = (receipt: Receipt): number => {
@@ -136,6 +148,32 @@ export default function ReceiptsPage() {
 
   const getFileName = (fileUrl: string): string => {
     return fileUrl.split('/').pop() || 'Unknown file';
+  };
+
+  const getDateRange = (receipt: Receipt): string => {
+    if (receipt.transactions.length === 0) {
+      return formatDate(receipt.uploadedAt);
+    }
+
+    const dates = receipt.transactions.map(t => new Date(t.transactionDate));
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+    // If same date, show single date
+    if (minDate.toDateString() === maxDate.toDateString()) {
+      return formatDate(minDate.toISOString());
+    }
+
+    // Show range
+    return `${formatDate(minDate.toISOString())} - ${formatDate(maxDate.toISOString())}`;
+  };
+
+  const getBankAccountInfo = (receipt: Receipt): string => {
+    if (receipt.transactions.length > 0 && receipt.transactions[0].userBankAccount) {
+      const account = receipt.transactions[0].userBankAccount;
+      return `${account.accountName}`;
+    }
+    return '';
   };
 
   return (
@@ -233,7 +271,7 @@ export default function ReceiptsPage() {
           {filteredReceipts.map((receipt, index) => {
             const status = getStatusFromProcessing(receipt.processingStatus);
             const fileName = getFileName(receipt.fileUrl);
-            const totalAmount = getTotalAmount(receipt);
+            const { income, expenses } = getTransactionTotals(receipt);
             const processedCount = getProcessedCount(receipt);
 
             return (
@@ -277,27 +315,45 @@ export default function ReceiptsPage() {
                         </h3>
                       </div>
 
-                      <div className="flex items-center text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center text-xs text-muted-foreground mb-1">
                         <Calendar size={12} className="mr-1" />
-                        {formatDate(receipt.uploadedAt)}
+                        {getDateRange(receipt)}
                       </div>
+
+                      {getBankAccountInfo(receipt) && (
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {getBankAccountInfo(receipt)}
+                        </div>
+                      )}
 
                       <div className="text-xs text-muted-foreground mb-4 capitalize">
                         {receipt.documentType?.replace(/_/g, ' ') || 'Receipt'}
                       </div>
 
-                      <div className="mt-auto pt-4 border-t border-border flex justify-between items-center text-sm">
-                        <div className="flex flex-col">
+                      <div className="mt-auto pt-4 border-t border-border space-y-3">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-xs text-muted-foreground">Approved Transactions</span>
                           <span className="font-medium text-foreground">
                             {processedCount}/{receipt.expectedTransactions}
                           </span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs text-muted-foreground">Total</span>
-                          <div className="font-medium text-foreground">
-                            {formatCurrency(totalAmount)}
-                          </div>
+
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          {income > 0 && (
+                            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                              <span className="text-base">↑</span>
+                              <span className="font-medium">{formatCurrency(income)}</span>
+                            </div>
+                          )}
+                          {expenses > 0 && (
+                            <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 ml-auto">
+                              <span className="text-base">↓</span>
+                              <span className="font-medium">{formatCurrency(expenses)}</span>
+                            </div>
+                          )}
+                          {income === 0 && expenses === 0 && (
+                            <span className="text-xs text-muted-foreground">No transactions</span>
+                          )}
                         </div>
                       </div>
                     </div>
