@@ -165,4 +165,118 @@ export interface ReviewTransaction {
     clarification_session_id: string | null;
 }
 
+// Complete Transaction Detail with all API fields
+export interface TransactionDetail {
+  id: string;
+  userId: string;
+  receiptId: string;
+  contactId: string | null;
+  categoryId: string | null;
+  userBankAccountId: string | null;
+  toBankAccountId: string | null;
+  amount: number;
+  currency: string;
+  transactionType: 'INCOME' | 'EXPENSE' | 'TRANSFER';
+  transactionDate: string;
+  isSelfTransaction: boolean;
+  subcategory: string | null;
+  description: string | null;
+  paymentMethod: string | null;
+  referenceNumber: string | null;
+  aiConfidence: number;
+  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  summary: string;
+  clarificationSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  category?: {
+    id: string;
+    name: string;
+    type: string;
+    userId: string | null;
+  } | null;
+  contact?: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  userBankAccount?: {
+    id: string;
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+  } | null;
+  toBankAccount?: {
+    id: string;
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+  } | null;
+  receipt?: {
+    id: string;
+    imageUrl: string;
+    extractedText: string | null;
+  } | null;
+}
+
+// API Response Types
+export interface GetAllTransactionsResponse {
+  message: string;
+  data: {
+    transactions: TransactionDetail[];
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
+export interface GetTransactionResponse {
+  message: string;
+  data: TransactionDetail;
+}
+
+export interface UpdateTransactionResponse {
+  message: string;
+  data: TransactionDetail;
+}
+
+export interface DeleteTransactionResponse {
+  message: string;
+  deletedId: string;
+}
+
+// Update Payload Type
+export interface UpdateTransactionPayload {
+  contactId?: string;
+  categoryId?: string;
+  userBankAccountId?: string;
+  toBankAccountId?: string;
+  amount?: number;
+  currency?: string;
+  transactionType?: 'INCOME' | 'EXPENSE' | 'TRANSFER';
+  transactionDate?: string;
+  isSelfTransaction?: boolean;
+  subcategory?: string;
+  description?: string;
+  paymentMethod?: string;
+  referenceNumber?: string;
+  aiConfidence?: number;
+  status?: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  summary?: string;
+}
+
+// Filter State Type for UI
+export interface TransactionFilters {
+  transactionType: 'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER';
+  categoryId?: string;
+  contactId?: string;
+  status?: 'ALL' | 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
+  searchQuery: string;
+}
+
 

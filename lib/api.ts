@@ -123,6 +123,27 @@ export const transactionsApi = {
 	// Check if receipt has batch session
 	getBatchSession: (receiptId: string) =>
 		api.get(`/receipt/batch-session/${receiptId}`),
+
+	// Core transaction CRUD endpoints
+	getAllTransactions: (params?: {
+		transactionType?: 'INCOME' | 'EXPENSE' | 'TRANSFER';
+		categoryId?: string;
+		contactId?: string;
+		startDate?: string;
+		endDate?: string;
+		status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+		limit?: number;
+		offset?: number;
+	}) => api.get('/transaction', { params }),
+
+	getTransactionById: (transactionId: string) =>
+		api.get(`/transaction/${transactionId}`),
+
+	updateTransaction: (transactionId: string, data: any) =>
+		api.put(`/transaction/${transactionId}`, data),
+
+	deleteTransaction: (transactionId: string) =>
+		api.delete(`/transaction/${transactionId}`),
 };
 
 export const contactsApi = {
