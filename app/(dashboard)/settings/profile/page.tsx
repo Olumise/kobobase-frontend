@@ -27,7 +27,7 @@ import type { UserProfile } from '@/lib/types/user';
 import { useAppDispatch } from '@/store/hooks';
 import { updateUserProfile as updateReduxProfile } from '@/store/slices/authSlice';
 
-// Common currencies
+
 const CURRENCIES = [
   { code: 'NGN', name: 'Nigerian Naira', symbol: '₦' },
   { code: 'USD', name: 'US Dollar', symbol: '$' },

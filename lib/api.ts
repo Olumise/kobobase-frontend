@@ -153,6 +153,9 @@ export const transactionsApi = {
 	getBatchSessionInfo: (batchSessionId: string) =>
 		api.get(`/transaction/batch/${batchSessionId}`),
 
+	// Navigate to specific transaction by index
+	getTransactionByIndex: (batchSessionId: string, index: number) =>
+		api.get(`/transaction/sequential/${batchSessionId}/transaction/${index}`),
 
 	approveAndNext: (batchSessionId: string, edits?: any) =>
 		api.post("/transaction/sequential/approve-and-next", { batchSessionId, edits }),

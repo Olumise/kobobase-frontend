@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search,
@@ -44,6 +45,8 @@ import { TransactionEditModal } from '@/components/transactions/TransactionEditM
 import { TransactionDeleteDialog } from '@/components/transactions/TransactionDeleteDialog';
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams();
+
   // Data state
   const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -77,6 +80,14 @@ export default function TransactionsPage() {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  // Handle URL search params
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+      setFilters(prev => ({ ...prev, searchQuery: urlSearch }));
+    }
+  }, [searchParams]);
 
   // Refetch when filters change
   useEffect(() => {

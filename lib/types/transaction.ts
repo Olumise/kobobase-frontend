@@ -163,6 +163,8 @@ export interface ReviewTransaction {
     needs_clarification: boolean;
     needs_confirmation: boolean;
     clarification_session_id: string | null;
+    processing_status?: 'approved' | 'skipped' | undefined;
+    created_transaction_id?: string | null;
 }
 
 // Complete Transaction Detail with all API fields

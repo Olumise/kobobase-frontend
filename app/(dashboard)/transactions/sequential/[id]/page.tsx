@@ -18,6 +18,7 @@ import {
 	TransactionState,
 } from "@/components/sequential/TransactionReviewCard";
 import { ClarificationChat } from "@/components/sequential/ClarificationChat";
+import { TransactionStepper } from "@/components/sequential/TransactionStepper";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +78,34 @@ export default function SequentialProcessingPage() {
 		}
 	}, [params.id]);
 
+	// Keyboard navigation
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Ignore if user is typing in an input/textarea
+			if (
+				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement
+			) {
+				return;
+			}
+
+			if (e.key === "ArrowLeft" && currentIndex > 0 && !isLoading) {
+				e.preventDefault();
+				handleBack();
+			} else if (
+				e.key === "ArrowRight" &&
+				currentIndex < transactions.length - 1 &&
+				!isLoading
+			) {
+				e.preventDefault();
+				handleNext();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [currentIndex, transactions.length, isLoading]);
+
 	const currentTxn = transactions[currentIndex];
 
 	const handleApprove = async (edits?: any) => {
@@ -99,17 +128,66 @@ export default function SequentialProcessingPage() {
 		}
 	};
 
-	const handleBack = () => {
-		if (currentIndex > 0) {
-			setCurrentIndex((prev) => prev - 1);
+	const handleBack = async () => {
+		if (!batchSession?.id || currentIndex === 0) return;
+
+		try {
+			setIsLoading(true);
+			const targetIndex = currentIndex - 1;
+			await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
+			// Refetch batch session to get updated data
+			await fetchBatchSession();
+		} catch (err: any) {
+			console.error("Error navigating to previous transaction:", err);
+			setError(err.response?.data?.message || "Failed to navigate to previous transaction");
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
-	const currentTxnState = currentTxn?.needs_clarification
-		? `CLARIFICATION_NEEDED`
-		: currentTxn?.needs_confirmation
-			? "NEEDS_CONFIRMATION"
-			: "READY";
+	const handleNext = async () => {
+		if (!batchSession?.id || currentIndex >= transactions.length - 1) return;
+
+		try {
+			setIsLoading(true);
+			const targetIndex = currentIndex + 1;
+			await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
+			// Refetch batch session to get updated data
+			await fetchBatchSession();
+		} catch (err: any) {
+			console.error("Error navigating to next transaction:", err);
+			setError(err.response?.data?.message || "Failed to navigate to next transaction");
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleGoToIndex = async (index: number) => {
+		if (!batchSession?.id || index < 0 || index >= transactions.length) return;
+
+		try {
+			setIsLoading(true);
+			await transactionsApi.getTransactionByIndex(batchSession.id, index);
+			// Refetch batch session to get updated data
+			await fetchBatchSession();
+		} catch (err: any) {
+			console.error("Error navigating to transaction:", err);
+			setError(err.response?.data?.message || "Failed to navigate to transaction");
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const currentTxnState: TransactionState =
+		currentTxn?.processing_status === "approved"
+			? "APPROVED"
+			: currentTxn?.processing_status === "skipped"
+				? "SKIPPED"
+				: currentTxn?.needs_clarification
+					? "CLARIFICATION_NEEDED"
+					: currentTxn?.needs_confirmation
+						? "NEEDS_CONFIRMATION"
+						: "READY";
 
 	// Loading state
 	if (isLoading) {
@@ -195,7 +273,7 @@ export default function SequentialProcessingPage() {
 
 			{/* Transaction Progress Counter */}
 			<Card className="p-4 mb-8 bg-card/50 border-dashed">
-				<div className="flex items-center justify-center gap-2">
+				<div className="flex items-center justify-center gap-2 mb-4">
 					<span className="text-sm text-muted-foreground">Transaction</span>
 					<span className="text-2xl font-bold text-foreground">
 						{currentIndex + 1}
@@ -205,6 +283,14 @@ export default function SequentialProcessingPage() {
 						{transactions.length}
 					</span>
 				</div>
+
+				{/* Transaction Stepper */}
+				<TransactionStepper
+					transactions={transactions}
+					currentIndex={currentIndex}
+					onNavigate={handleGoToIndex}
+					isLoading={isLoading}
+				/>
 			</Card>
 
 			<div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full pb-12">
@@ -227,12 +313,16 @@ export default function SequentialProcessingPage() {
 				</AnimatePresence>
 
 				{/* Navigation Info */}
-				<div className="mt-8 flex items-center gap-12 text-sm text-muted-foreground font-medium">
+				<div className="mt-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-12 text-sm text-muted-foreground font-medium">
 					<button
 						onClick={handleBack}
-						disabled={currentIndex === 0}
+						disabled={currentIndex === 0 || isLoading}
 						className="flex items-center gap-1 hover:text-foreground disabled:opacity-30 transition-colors">
-						<ChevronLeft size={16} /> Previous
+						<ChevronLeft size={16} />
+						<span className="hidden sm:inline">Previous</span>
+						<kbd className="ml-1 px-1.5 py-0.5 text-xs bg-muted rounded border hidden sm:inline-block">
+							←
+						</kbd>
 					</button>
 
 					<div className="flex items-center gap-2">
@@ -240,14 +330,19 @@ export default function SequentialProcessingPage() {
 							size={14}
 							className="text-primary"
 						/>
-						<span>AI Assisted Verification Active</span>
+						<span className="hidden lg:inline">AI Assisted Verification Active</span>
+						<span className="lg:hidden">AI Active</span>
 					</div>
 
 					<button
-						onClick={handleApprove}
-						disabled={currentIndex === transactions.length - 1}
+						onClick={handleNext}
+						disabled={currentIndex === transactions.length - 1 || isLoading}
 						className="flex items-center gap-1 hover:text-foreground disabled:opacity-30 transition-colors">
-						Next <ChevronRight size={16} />
+						<kbd className="mr-1 px-1.5 py-0.5 text-xs bg-muted rounded border hidden sm:inline-block">
+							→
+						</kbd>
+						<span className="hidden sm:inline">Next</span>
+						<ChevronRight size={16} />
 					</button>
 				</div>
 			</div>

@@ -1,9 +1,8 @@
 
 'use client';
 
-import { Bell, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
+import { Bell, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,6 +21,7 @@ import {
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { clearUser } from '@/store/slices/authSlice';
 import { logout as logoutUser } from '@/lib/auth';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
 
 export function Header() {
   const pathname = usePathname();
@@ -69,13 +69,8 @@ export function Header() {
       {/* Right Actions */}
       <div className="flex items-center space-x-4">
         {/* Search */}
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search transactions..."
-            className="h-9 w-64 rounded-full pl-9 bg-muted/50 border-input focus:bg-background transition-all"
-          />
+        <div className="hidden md:block">
+          <GlobalSearch />
         </div>
 
         {/* Notifications */}

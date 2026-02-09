@@ -43,7 +43,9 @@ import { contactsApi, categoriesApi, transactionsApi } from "@/lib/api";
 export type TransactionState =
 	| "READY"
 	| "CLARIFICATION_NEEDED"
-	| "NEEDS_CONFIRMATION";
+	| "NEEDS_CONFIRMATION"
+	| "APPROVED"
+	| "SKIPPED";
 
 interface BankAccount {
 	id: string;
@@ -228,6 +230,20 @@ export function TransactionReviewCard({
 					icon: Info,
 					text: "Action required",
 				};
+			case "APPROVED":
+				return {
+					variant: "default" as const,
+					className: "bg-emerald-500/10 text-emerald-600 border-emerald-500",
+					icon: Check,
+					text: "Already approved",
+				};
+			case "SKIPPED":
+				return {
+					variant: "secondary" as const,
+					className: "bg-gray-400/10 text-gray-600 border-gray-400",
+					icon: SkipForward,
+					text: "Previously skipped",
+				};
 		}
 	};
 
@@ -295,6 +311,50 @@ export function TransactionReviewCard({
 			{/* Main Card */}
 			<Card className="shadow-sm overflow-hidden">
 				<CardContent className="p-6 md:p-8 space-y-8">
+					{/* Alert for Already Approved */}
+					{state === "APPROVED" && (
+						<motion.div
+							initial={{ opacity: 0, height: 0 }}
+							animate={{ opacity: 1, height: "auto" }}
+							className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex gap-3">
+							<Check
+								className="text-emerald-600 shrink-0 mt-0.5"
+								size={18}
+							/>
+							<div className="flex-1">
+								<h4 className="font-medium text-emerald-800 text-sm">
+									This transaction has already been approved
+								</h4>
+								{transaction?.created_transaction_id && (
+									<p className="text-emerald-700 text-xs mt-1">
+										Transaction ID: {transaction.created_transaction_id}
+									</p>
+								)}
+							</div>
+						</motion.div>
+					)}
+
+					{/* Alert for Skipped */}
+					{state === "SKIPPED" && (
+						<motion.div
+							initial={{ opacity: 0, height: 0 }}
+							animate={{ opacity: 1, height: "auto" }}
+							className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex gap-3">
+							<SkipForward
+								className="text-gray-600 shrink-0 mt-0.5"
+								size={18}
+							/>
+							<div className="flex-1">
+								<h4 className="font-medium text-gray-800 text-sm">
+									This transaction was previously skipped
+								</h4>
+								<p className="text-gray-700 text-xs mt-1">
+									You can still approve it if needed
+								</p>
+							</div>
+						</motion.div>
+					)}
+
 					{/* Alert for Clarification */}
 					{state === "CLARIFICATION_NEEDED" && (
 						<motion.div
@@ -302,14 +362,13 @@ export function TransactionReviewCard({
 							animate={{ opacity: 1, height: "auto" }}
 							className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
 							<AlertTriangle
-								className="text-amber-600 flex-shrink-0 mt-0.5"
+								className="text-amber-600 shrink-0 mt-0.5"
 								size={18}
 							/>
 							<div className="flex-1">
 								<h4 className="font-medium text-amber-800 text-sm">
 									Please provide the following information:
 								</h4>
-								{/* Show questions prominently */}
 								{transaction?.questions && transaction.questions.length > 0 && (
 									<ul className="mt-2 space-y-1">
 										{transaction.questions.map((q: string, i: number) => (
@@ -317,7 +376,6 @@ export function TransactionReviewCard({
 										))}
 									</ul>
 								)}
-								{/* Optionally show notes as secondary info */}
 								{transaction?.notes && (
 									<details className="mt-2">
 										<summary className="text-xs text-amber-600 cursor-pointer hover:text-amber-700">
@@ -586,9 +644,18 @@ export function TransactionReviewCard({
 								const edits = collectEdits();
 								onApprove(edits);
 							}}
-							disabled={state === "CLARIFICATION_NEEDED" || isApproving}
+							disabled={
+								state === "CLARIFICATION_NEEDED" ||
+								state === "APPROVED" ||
+								isApproving
+							}
 							size="lg"
-							className="flex-1 sm:flex-none px-8 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-lg transition-all">
+							className={cn(
+								"flex-1 sm:flex-none px-8 font-medium shadow-lg transition-all",
+								state === "APPROVED"
+									? "bg-emerald-600 hover:bg-emerald-600 cursor-not-allowed opacity-60"
+									: "bg-primary hover:bg-primary/95 text-primary-foreground"
+							)}>
 							{isApproving ? (
 								<>
 									<Loader2
@@ -596,6 +663,14 @@ export function TransactionReviewCard({
 										className="mr-2 animate-spin"
 									/>
 									Approving...
+								</>
+							) : state === "APPROVED" ? (
+								<>
+									<Check
+										size={18}
+										className="mr-2"
+									/>
+									Already Approved
 								</>
 							) : (
 								<>
