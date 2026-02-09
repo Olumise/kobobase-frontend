@@ -7,6 +7,8 @@ interface User {
   email: string
   emailVerified: boolean
   image: string | null
+  defaultCurrency: string
+  customContextPrompt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -37,6 +39,16 @@ const authSlice = createSlice({
         localStorage.setItem('user', JSON.stringify(action.payload))
       }
     },
+    updateUserProfile: (state, action: PayloadAction<Partial<User>>) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload }
+
+        // Persist to localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user', JSON.stringify(state.user))
+        }
+      }
+    },
     clearUser: (state) => {
       state.user = null
       state.isAuthenticated = false
@@ -58,7 +70,7 @@ const authSlice = createSlice({
   },
 })
 
-export const { setUser, clearUser, setLoading, hydrate } = authSlice.actions
+export const { setUser, updateUserProfile, clearUser, setLoading, hydrate } = authSlice.actions
 
 // Thunk to load auth from localStorage
 export const loadAuthFromStorage = () => (dispatch: AppDispatch) => {

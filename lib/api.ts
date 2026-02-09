@@ -5,6 +5,31 @@ import type {
 	ReceiptUploadError,
 	ReceiptExtractionError,
 } from "./types/receipt";
+import type {
+	CreateBankAccountPayload,
+	UpdateBankAccountPayload,
+	MatchBankAccountPayload,
+} from "./types/bankAccount";
+import type {
+	CreateContactPayload,
+	UpdateContactPayload,
+} from "./types/contact";
+import type {
+	CreateCategoryPayload,
+	UpdateCategoryPayload,
+} from "./types/category";
+import type {
+	TransactionStatsResponse,
+	StatsQueryParams,
+	UsageStatsResponse,
+	UsageSessionsResponse,
+	UsageBreakdownResponse,
+} from "./types/stats";
+import type {
+	UserProfile,
+	UpdateUserProfileRequest,
+	ChangePasswordRequest,
+} from "./types/user";
 
 const api = axios.create({
 	baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -69,13 +94,33 @@ export const receiptsApi = {
 };
 
 export const bankAccountsApi = {
-
 	getUserBankAccounts: (isActive: boolean = true) =>
 		api.get("/bank-account", {
 			params: {
 				isActive
 			}
 		}),
+
+	createBankAccount: (data: CreateBankAccountPayload) =>
+		api.post("/bank-account", data),
+
+	matchBankAccount: (data: MatchBankAccountPayload) =>
+		api.post("/bank-account/match", data),
+
+	getPrimaryBankAccount: () =>
+		api.get("/bank-account/primary"),
+
+	getBankAccountById: (accountId: string) =>
+		api.get(`/bank-account/${accountId}`),
+
+	updateBankAccount: (accountId: string, data: UpdateBankAccountPayload) =>
+		api.put(`/bank-account/${accountId}`, data),
+
+	deleteBankAccount: (accountId: string) =>
+		api.delete(`/bank-account/${accountId}`),
+
+	setPrimaryAccount: (accountId: string) =>
+		api.patch(`/bank-account/${accountId}/set-primary`),
 };
 
 export const transactionsApi = {
@@ -150,18 +195,8 @@ export const contactsApi = {
 	findContact: (contactName: string) =>
 		api.post("/contact/find", { contactName }),
 
-	createContact: (data: {
-		name: string;
-		normalizedName?: string;
-		ContactType?: string;
-		categoryId?: string;
-		typicalAmountRangeMin?: number;
-		typicalAmountRangeMax?: number;
-		nameVariations?: string[];
-		transactionCount?: number;
-		lastTransactionDate?: string;
-		notes?: string;
-	}) => api.post("/contact", data),
+	createContact: (data: CreateContactPayload) =>
+		api.post("/contact", data),
 
 	searchContacts: (searchTerm: string, limit?: number) =>
 		api.get("/contact/search", {
@@ -176,16 +211,8 @@ export const contactsApi = {
 	getContactById: (contactId: string) =>
 		api.get(`/contact/${contactId}`),
 
-	updateContact: (contactId: string, data: {
-		name?: string;
-		normalizedName?: string;
-		ContactType?: string;
-		categoryId?: string;
-		typicalAmountRangeMin?: number;
-		typicalAmountRangeMax?: number;
-		nameVariations?: string[];
-		notes?: string;
-	}) => api.put(`/contact/${contactId}`, data),
+	updateContact: (contactId: string, data: UpdateContactPayload) =>
+		api.put(`/contact/${contactId}`, data),
 
 	incrementTransactionCount: (contactId: string, transactionDate: string) =>
 		api.patch(`/contact/${contactId}/increment`, { transactionDate }),
@@ -195,13 +222,8 @@ export const categoriesApi = {
 	findCategory: (categoryName: string) =>
 		api.post("/category/find", { categoryName }),
 
-	createCategory: (data: {
-		name: string;
-		icon?: string;
-		color?: string;
-		isSystemCategory?: boolean;
-		isActive?: boolean;
-	}) => api.post("/category", data),
+	createCategory: (data: CreateCategoryPayload) =>
+		api.post("/category", data),
 
 	getAllCategories: () =>
 		api.get("/category/all"),
@@ -218,12 +240,8 @@ export const categoriesApi = {
 	getCategoryById: (categoryId: string) =>
 		api.get(`/category/${categoryId}`),
 
-	updateCategory: (categoryId: string, data: {
-		name?: string;
-		icon?: string;
-		color?: string;
-		isActive?: boolean;
-	}) => api.put(`/category/${categoryId}`, data),
+	updateCategory: (categoryId: string, data: UpdateCategoryPayload) =>
+		api.put(`/category/${categoryId}`, data),
 
 	deleteCategory: (categoryId: string) =>
 		api.delete(`/category/${categoryId}`),
@@ -251,6 +269,37 @@ export const clarificationApi = {
 
 	confirmSession: (sessionId: string, confirmations: Record<string, any>) =>
 		api.post(`/clarification/session/${sessionId}/confirm`, { confirmations }),
+};
+
+export const transactionStatsApi = {
+	getTransactionStats: (params?: StatsQueryParams) =>
+		api.get<TransactionStatsResponse>("/transaction/stats", { params }),
+};
+
+export const usageApi = {
+	getMyUsage: (period?: "all-time" | "current-month") =>
+		api.get<UsageStatsResponse>("/usage/me", {
+			params: period ? { period } : undefined,
+		}),
+
+	getMySessions: (limit?: number) =>
+		api.get<UsageSessionsResponse>("/usage/me/sessions", {
+			params: limit ? { limit } : undefined,
+		}),
+
+	getMyBreakdown: () =>
+		api.get<UsageBreakdownResponse>("/usage/me/breakdown"),
+};
+
+export const userApi = {
+	getProfile: () =>
+		api.get<{ message: string; data: UserProfile }>("/user/profile"),
+
+	updateProfile: (data: UpdateUserProfileRequest) =>
+		api.patch<{ message: string; data: UserProfile }>("/user/profile", data),
+
+	changePassword: (data: ChangePasswordRequest) =>
+		api.post<{ message: string }>("/user/change-password", data),
 };
 
 export default api;

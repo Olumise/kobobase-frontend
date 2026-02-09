@@ -357,7 +357,7 @@ export function TransactionEditModal({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="transfer">Transfer</SelectItem>
                       <SelectItem value="card">Card</SelectItem>

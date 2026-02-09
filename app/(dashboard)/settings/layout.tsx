@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const tabs = [
+  { name: 'Profile', href: '/settings/profile' },
   { name: 'Categories', href: '/settings/categories' },
   { name: 'Contacts', href: '/settings/contacts' },
   { name: 'Bank Accounts', href: '/settings/accounts' },

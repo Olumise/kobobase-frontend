@@ -6,6 +6,8 @@ export interface User {
 	email: string;
 	emailVerified: boolean;
 	image: string | null;
+	defaultCurrency: string;
+	customContextPrompt: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
