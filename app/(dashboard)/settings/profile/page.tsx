@@ -138,9 +138,10 @@ export default function ProfilePage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file');
+    // Validate file type (only JPEG, PNG, WEBP as per backend)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a JPEG, PNG, or WEBP image');
       return;
     }
 
@@ -153,17 +154,48 @@ export default function ProfilePage() {
     try {
       setIsUploadingImage(true);
       setError(null);
+      setSuccess(null);
 
-      // Convert to base64 for preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        profileForm.setValue('image', reader.result as string);
+      // Step 1: Upload image to get URL
+      const uploadResponse = await userApi.uploadImage(file);
+      const imageUrl = uploadResponse.data.url;
+
+      // Set preview
+      setImagePreview(imageUrl);
+
+      // Step 2: Update profile with new image URL
+      const updateData: any = {
+        name: profileForm.getValues('name'),
+        email: profileForm.getValues('email'),
+        defaultCurrency: profileForm.getValues('defaultCurrency'),
+        image: imageUrl,
       };
-      reader.readAsDataURL(file);
+
+      const customPrompt = profileForm.getValues('customContextPrompt');
+      if (customPrompt) {
+        updateData.customContextPrompt = customPrompt;
+      }
+
+      const response = await userApi.updateProfile(updateData);
+      const updatedProfile = response.data?.data || response.data;
+      setProfile(updatedProfile);
+
+      // Update form value
+      profileForm.setValue('image', imageUrl);
+
+      // Refetch session to update Better Auth's state with new profile data
+      await refetchSession();
+
+      setSuccess('Profile image updated successfully!');
     } catch (err: any) {
       console.error('Error uploading image:', err);
-      setError('Failed to upload image');
+      setError(err.response?.data?.error || 'Failed to upload image');
+
+      // Reset file input and preview on error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setImagePreview(profile?.image || null);
     } finally {
       setIsUploadingImage(false);
     }
@@ -398,7 +430,7 @@ export default function ProfilePage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleImageUpload}
                     className="hidden"
                     id="image-upload"
@@ -422,7 +454,7 @@ export default function ProfilePage() {
                     )}
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
-                    JPG, PNG or GIF (max 5MB)
+                    JPEG, PNG or WEBP (max 5MB)
                   </p>
                 </div>
               </div>

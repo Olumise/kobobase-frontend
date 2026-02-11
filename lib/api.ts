@@ -91,6 +91,23 @@ export const receiptsApi = {
 
 		return response.data;
 	},
+
+	updateReceiptFile: async (receiptId: string, file: File): Promise<UploadReceiptResponse> => {
+		const formData = new FormData();
+		formData.append("receipt", file);
+
+		const response = await api.patch<UploadReceiptResponse>(
+			`/receipt/update-file/${receiptId}`,
+			formData,
+			{
+				headers: {
+					"Content-Type": "multipart/form-data",
+				},
+			},
+		);
+
+		return response.data;
+	},
 };
 
 export const bankAccountsApi = {
@@ -303,6 +320,23 @@ export const userApi = {
 
 	changePassword: (data: ChangePasswordRequest) =>
 		api.post<{ message: string }>("/user/change-password", data),
+
+	uploadImage: async (file: File): Promise<{ message: string; data: { url: string; path: string; filename: string } }> => {
+		const formData = new FormData();
+		formData.append("image", file);
+
+		const response = await api.post<{ message: string; data: { url: string; path: string; filename: string } }>(
+			"/user/upload-image",
+			formData,
+			{
+				headers: {
+					"Content-Type": "multipart/form-data",
+				},
+			},
+		);
+
+		return response.data;
+	},
 };
 
 export default api;

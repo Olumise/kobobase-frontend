@@ -36,6 +36,7 @@ import { useSequentialProcessing } from '@/hooks/useSequentialProcessing';
 import { BankAccountSelector } from '@/components/receipts/BankAccountSelector';
 import { ReprocessWarningDialog } from '@/components/receipts/ReprocessWarningDialog';
 import { DeleteReceiptDialog } from '@/components/receipts/DeleteReceiptDialog';
+import { ExtractionErrorDialog } from '@/components/receipts/ExtractionErrorDialog';
 import type { Transaction, BatchSession } from '@/lib/types/transaction';
 
 interface Receipt {
@@ -82,6 +83,11 @@ export default function ReceiptDetailsPage() {
 
   // Extraction state management
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [showExtractionErrorDialog, setShowExtractionErrorDialog] = useState(false);
+
+  // Update receipt file state
+  const [isUpdatingFile, setIsUpdatingFile] = useState(false);
 
   // SSE Progress Hook
   const {
@@ -185,6 +191,11 @@ export default function ReceiptDetailsPage() {
     checkSessionState();
   }, [receipt?.id, receipt?.batchSessions, receipt?.transactions]);
 
+  // Check if user has previously completed a session OR has approved transactions
+  const hasCompletedSession = receipt?.batchSessions?.some(
+    (session: BatchSession) => session.status === 'completed'
+  ) || (receipt?.transactions && receipt.transactions.length > 0);
+
   const handleProcessButtonClick = () => {
     if (!receipt?.id) return;
 
@@ -247,6 +258,7 @@ export default function ReceiptDetailsPage() {
 
     try {
       setIsExtracting(true);
+      setExtractionError(null);
       const extractResponse = await receiptsApi.extractReceipt(receipt.id);
 
       // Check if no transactions were detected
@@ -261,8 +273,39 @@ export default function ReceiptDetailsPage() {
       window.location.reload();
     } catch (error: any) {
       console.error('Error extracting receipt:', error);
+
+      // Check if it's a PDF page limit error or other processing error
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to extract receipt';
+      setExtractionError(errorMessage);
+      setShowExtractionErrorDialog(true);
       setIsExtracting(false);
     }
+  };
+
+  const handleUpdateReceiptFile = async (file: File) => {
+    if (!receipt?.id) return;
+
+    try {
+      setIsUpdatingFile(true);
+      await receiptsApi.updateReceiptFile(receipt.id, file);
+
+      // Close the error dialog
+      setShowExtractionErrorDialog(false);
+      setExtractionError(null);
+
+      // Reload the page to show the updated receipt
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error updating receipt file:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to update receipt file';
+      setExtractionError(errorMessage);
+      setIsUpdatingFile(false);
+    }
+  };
+
+  const handleDeleteFromErrorDialog = async () => {
+    await handleDeleteReceipt();
+    setShowExtractionErrorDialog(false);
   };
 
   // Handle processing completion
@@ -513,9 +556,28 @@ export default function ReceiptDetailsPage() {
                     </h2>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-medium">
                       {activeBatchSession?.extractedData?.transaction_results ? (
-                        <Badge variant="outline" className="text-blue-600 bg-blue-500/5 border-blue-500/10 gap-1 px-2">
-                          <Loader2 size={12} className="animate-spin" /> In Progress ({activeBatchSession.totalProcessed || 0} of {activeBatchSession.totalExpected} processed)
-                        </Badge>
+                        (() => {
+                          const txnResults = activeBatchSession.extractedData.transaction_results;
+                          const approved = txnResults.filter((t: any) => t.processing_status === 'approved').length;
+                          const skipped = txnResults.filter((t: any) => t.processing_status === 'skipped').length;
+                          const processed = approved + skipped;
+                          const total = txnResults.length;
+                          const allProcessed = processed === total;
+
+                          if (allProcessed) {
+                            return (
+                              <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
+                                <CheckCircle2 size={12} /> All Processed ({approved} approved{skipped > 0 ? `, ${skipped} skipped` : ''})
+                              </Badge>
+                            );
+                          }
+
+                          return (
+                            <Badge variant="outline" className="text-blue-600 bg-blue-500/5 border-blue-500/10 gap-1 px-2">
+                              <Loader2 size={12} className="animate-spin" /> In Progress ({processed} of {total} processed)
+                            </Badge>
+                          );
+                        })()
                       ) : (
                         <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
                           <CheckCircle2 size={12} /> Approved
@@ -671,7 +733,7 @@ export default function ReceiptDetailsPage() {
                     return `Continue Approval (${activeBatchSession.currentIndex || 0} of ${activeBatchSession.totalExpected})`;
                   })()
                 ) : (
-                  'Initiate Transaction Processing'
+                  hasCompletedSession ? 'Reinitiate Transaction Processing' : 'Initiate Transaction Processing'
                 )}
               </Button>
             )}
@@ -703,6 +765,17 @@ export default function ReceiptDetailsPage() {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDeleteReceipt}
         transactionCount={receipt?.transactions?.length || 0}
+        isDeleting={isDeleting}
+      />
+
+      {/* Extraction Error Dialog */}
+      <ExtractionErrorDialog
+        isOpen={showExtractionErrorDialog}
+        onClose={() => setShowExtractionErrorDialog(false)}
+        errorMessage={extractionError || 'An error occurred while processing the receipt'}
+        onUpdateFile={handleUpdateReceiptFile}
+        onDelete={handleDeleteFromErrorDialog}
+        isUpdating={isUpdatingFile}
         isDeleting={isDeleting}
       />
 

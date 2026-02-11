@@ -146,6 +146,13 @@ export default function ReceiptsPage() {
     return receipt.transactions.length;
   };
 
+  const getTotalExpected = (receipt: Receipt): number => {
+    if (receipt.batchSessions.length > 0) {
+      return receipt.batchSessions[0].totalExpected;
+    }
+    return receipt.expectedTransactions || 0;
+  };
+
   const getFileName = (fileUrl: string): string => {
     return fileUrl.split('/').pop() || 'Unknown file';
   };
@@ -281,10 +288,10 @@ export default function ReceiptsPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Link href={`/receipts/${receipt.id}`} className="block group">
-                  <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/50 transition-all h-full flex flex-col">
+                <Link href={`/receipts/${receipt.id}`} className="block group h-full">
+                  <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/50 transition-all h-full flex flex-col min-h-100">
                     {/* Preview / Thumbnail */}
-                    <div className="relative h-40 bg-muted/30 flex items-center justify-center p-4 group-hover:bg-muted/50 transition-colors">
+                    <div className="relative h-40 bg-muted/30 flex items-center justify-center p-4 group-hover:bg-muted/50 transition-colors shrink-0">
                       <div className="w-24 h-32 bg-white shadow-sm border border-gray-200 rounded flex flex-col items-center justify-center p-2 relative transform group-hover:-translate-y-1 transition-transform duration-300">
                         <FileText className="text-gray-400 mb-2" size={32} />
                         <div className="w-full h-1 bg-gray-100 mb-1 rounded"></div>
@@ -330,32 +337,54 @@ export default function ReceiptsPage() {
                         {receipt.documentType?.replace(/_/g, ' ') || 'Receipt'}
                       </div>
 
-                      <div className="mt-auto pt-4 border-t border-border space-y-3">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-xs text-muted-foreground">Processed Transactions</span>
-                          <span className="font-medium text-foreground">
-                            {processedCount}/{receipt.batchSessions[0].totalExpected}
-                          </span>
-                        </div>
+                      {/* Only show transaction details for processed receipts */}
+                      {status === 'PROCESSED' && (
+                        <div className="mt-auto pt-4 border-t border-border space-y-3">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-xs text-muted-foreground">Processed Transactions</span>
+                            <span className="font-medium text-foreground">
+                              {processedCount}/{getTotalExpected(receipt)}
+                            </span>
+                          </div>
 
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          {income > 0 && (
-                            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                              <span className="text-base">↑</span>
-                              <span className="font-medium">{formatCurrency(income)}</span>
-                            </div>
-                          )}
-                          {expenses > 0 && (
-                            <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 ml-auto">
-                              <span className="text-base">↓</span>
-                              <span className="font-medium">{formatCurrency(expenses)}</span>
-                            </div>
-                          )}
-                          {income === 0 && expenses === 0 && (
-                            <span className="text-xs text-muted-foreground">No transactions</span>
-                          )}
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            {income > 0 && (
+                              <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                <span className="text-base">↑</span>
+                                <span className="font-medium">{formatCurrency(income)}</span>
+                              </div>
+                            )}
+                            {expenses > 0 && (
+                              <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 ml-auto">
+                                <span className="text-base">↓</span>
+                                <span className="font-medium">{formatCurrency(expenses)}</span>
+                              </div>
+                            )}
+                            {income === 0 && expenses === 0 && (
+                              <span className="text-xs text-muted-foreground">No transactions</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Show status message for pending/failed receipts */}
+                      {status === 'PENDING' && (
+                        <div className="mt-auto pt-4 border-t border-border">
+                          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                            <Clock size={14} />
+                            <span>Processing receipt...</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {status === 'FAILED' && (
+                        <div className="mt-auto pt-4 border-t border-border">
+                          <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400">
+                            <AlertCircle size={14} />
+                            <span>Processing failed</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>

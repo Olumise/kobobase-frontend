@@ -419,10 +419,10 @@ export default function Dashboard() {
                         />
                       </PieChart>
                     </ChartContainer>
-                    {/* Center Text */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-xs text-muted-foreground uppercase font-medium">Top Spend</span>
-                      <span className="text-xl font-semibold text-foreground">{topCategory}</span>
+                    {/* Center Text - positioned absolutely with z-index */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10">
+                      <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">Top Spend</span>
+                      <span className="text-base font-bold text-foreground mt-0.5 max-w-[100px] text-center truncate">{topCategory}</span>
                     </div>
                   </div>
 
