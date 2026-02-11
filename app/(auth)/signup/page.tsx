@@ -19,9 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAppDispatch } from "@/store/hooks"
-import { setUser } from "@/store/slices/authSlice"
-import { signup as signupUser } from "@/lib/auth"
+import { signUp } from "@/lib/auth-client"
 
 const signupSchema = z.object({
   name: z.string().min(2, {
@@ -39,7 +37,6 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const dispatch = useAppDispatch()
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -54,12 +51,22 @@ export default function SignupPage() {
     setIsLoading(true)
     setError(null)
     try {
-      // Signup will set HTTP-only cookies automatically via Better Auth
-      const user = await signupUser(values.name, values.email, values.password)
-      dispatch(setUser(user))
+      // Use Better Auth's signUp method
+      const { data, error: authError } = await signUp.email({
+        email: values.email,
+        password: values.password,
+        name: values.name,
+      })
+
+      if (authError) {
+        setError(authError.message || 'Signup failed')
+        return
+      }
+
+      // Better Auth's useSession hook will automatically update state
       router.push('/dashboard')
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || 'Signup failed. Please try again.'
+      const errorMessage = error?.message || 'Signup failed. Please try again.'
       setError(errorMessage)
       console.error('Signup failed:', error)
     } finally {

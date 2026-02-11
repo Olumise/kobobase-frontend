@@ -311,8 +311,8 @@ export function TransactionReviewCard({
 			{/* Main Card */}
 			<Card className="shadow-sm overflow-hidden">
 				<CardContent className="p-6 md:p-8 space-y-8">
-					{/* Alert for Already Approved */}
-					{state === "APPROVED" && (
+					{/* Alert for Already Approved - based on processing_status */}
+					{transaction?.processing_status === "approved" && (
 						<motion.div
 							initial={{ opacity: 0, height: 0 }}
 							animate={{ opacity: 1, height: "auto" }}
@@ -334,8 +334,8 @@ export function TransactionReviewCard({
 						</motion.div>
 					)}
 
-					{/* Alert for Skipped */}
-					{state === "SKIPPED" && (
+					{/* Alert for Skipped - based on processing_status */}
+					{transaction?.processing_status === "skipped" && (
 						<motion.div
 							initial={{ opacity: 0, height: 0 }}
 							animate={{ opacity: 1, height: "auto" }}
@@ -355,8 +355,8 @@ export function TransactionReviewCard({
 						</motion.div>
 					)}
 
-					{/* Alert for Clarification */}
-					{state === "CLARIFICATION_NEEDED" && (
+					{/* Alert for Clarification - based on needs_clarification */}
+					{transaction?.needs_clarification && (
 						<motion.div
 							initial={{ opacity: 0, height: 0 }}
 							animate={{ opacity: 1, height: "auto" }}
@@ -371,8 +371,10 @@ export function TransactionReviewCard({
 								</h4>
 								{transaction?.questions && transaction.questions.length > 0 && (
 									<ul className="mt-2 space-y-1">
-										{transaction.questions.map((q: string, i: number) => (
-											<li key={i} className="text-amber-700 text-xs">• {q}</li>
+										{transaction.questions.map((q: any, i: number) => (
+											<li key={i} className="text-amber-700 text-xs">
+												• {typeof q === 'string' ? q : q?.question || 'Missing question'}
+											</li>
 										))}
 									</ul>
 								)}
@@ -386,6 +388,27 @@ export function TransactionReviewCard({
 										</p>
 									</details>
 								)}
+							</div>
+						</motion.div>
+					)}
+
+					{/* Alert for Confirmation - based on needs_confirmation */}
+					{transaction?.needs_confirmation && (
+						<motion.div
+							initial={{ opacity: 0, height: 0 }}
+							animate={{ opacity: 1, height: "auto" }}
+							className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+							<Info
+								className="text-blue-600 shrink-0 mt-0.5"
+								size={18}
+							/>
+							<div className="flex-1">
+								<h4 className="font-medium text-blue-800 text-sm">
+									Action required: Please review and confirm
+								</h4>
+								<p className="text-blue-700 text-xs mt-1">
+									This transaction requires your confirmation before approval
+								</p>
 							</div>
 						</motion.div>
 					)}
@@ -622,12 +645,13 @@ export function TransactionReviewCard({
 					<Button
 						variant="ghost"
 						onClick={onSkip}
-						className="text-muted-foreground hover:text-foreground font-medium transition-colors">
+						disabled={transaction?.processing_status === "approved" || transaction?.processing_status === "skipped"}
+						className="text-muted-foreground hover:text-foreground font-medium transition-colors disabled:opacity-50">
 						<SkipForward
 							size={18}
 							className="mr-2"
 						/>
-						Skip
+						{transaction?.processing_status === "skipped" ? "Already Skipped" : "Skip"}
 					</Button>
 
 					<div className="flex gap-3 w-full sm:w-auto">
@@ -645,14 +669,14 @@ export function TransactionReviewCard({
 								onApprove(edits);
 							}}
 							disabled={
-								state === "CLARIFICATION_NEEDED" ||
-								state === "APPROVED" ||
+								transaction?.needs_clarification ||
+								transaction?.processing_status === "approved" ||
 								isApproving
 							}
 							size="lg"
 							className={cn(
 								"flex-1 sm:flex-none px-8 font-medium shadow-lg transition-all",
-								state === "APPROVED"
+								transaction?.processing_status === "approved"
 									? "bg-emerald-600 hover:bg-emerald-600 cursor-not-allowed opacity-60"
 									: "bg-primary hover:bg-primary/95 text-primary-foreground"
 							)}>
@@ -664,7 +688,7 @@ export function TransactionReviewCard({
 									/>
 									Approving...
 								</>
-							) : state === "APPROVED" ? (
+							) : transaction?.processing_status === "approved" ? (
 								<>
 									<Check
 										size={18}

@@ -332,9 +332,9 @@ export default function ReceiptsPage() {
 
                       <div className="mt-auto pt-4 border-t border-border space-y-3">
                         <div className="flex justify-between items-center text-sm">
-                          <span className="text-xs text-muted-foreground">Approved Transactions</span>
+                          <span className="text-xs text-muted-foreground">Processed Transactions</span>
                           <span className="font-medium text-foreground">
-                            {processedCount}/{receipt.expectedTransactions}
+                            {processedCount}/{receipt.batchSessions[0].totalExpected}
                           </span>
                         </div>
 

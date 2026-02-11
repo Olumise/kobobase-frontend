@@ -18,29 +18,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { clearUser } from '@/store/slices/authSlice';
-import { logout as logoutUser } from '@/lib/auth';
+import { useSession, logout as logoutUser } from '@/lib/auth-client';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
-
+  const { data: session, isPending, error } = useSession();
+  const user = session?.user;
   const handleLogout = async () => {
     try {
       // Call backend to clear session cookies
       await logoutUser();
-      // Clear user from Redux store
-      dispatch(clearUser());
+      // Better Auth's useSession will automatically detect the session is gone
       // Redirect to login
       router.push('/login');
     } catch (error) {
       console.error('Logout failed:', error);
-      // Still clear local state and redirect even if API call fails
-      dispatch(clearUser());
+      // Still redirect even if API call fails
       router.push('/login');
     }
   };

@@ -142,24 +142,36 @@ export default function ReceiptDetailsPage() {
         setIsCheckingSession(true);
 
         // Find the most recent in-progress batch session
-        const inProgressSession = receipt.batchSessions
+        const relevantSession = receipt.batchSessions
           ?.filter((session: BatchSession) => session.status === 'in_progress')
           .sort((a: BatchSession, b: BatchSession) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )[0];
 
-        setActiveBatchSession(inProgressSession || null);
+        setActiveBatchSession(relevantSession || null);
 
-        // Determine button state
-        // Priority 1: Check for in-progress session first
+        // Determine button state - only show "continue" for in-progress sessions
         if (
-          inProgressSession?.extractedData?.transaction_results &&
-          inProgressSession.extractedData.transaction_results.length > 0
+          relevantSession &&
+          relevantSession.status === 'in_progress' &&
+          relevantSession.extractedData?.transaction_results &&
+          relevantSession.extractedData.transaction_results.length > 0
         ) {
-          // Has active session - allow continuation
-          setButtonState('continue');
+          // Check if there are any skipped or unprocessed transactions
+          const hasSkippedOrUnprocessed = relevantSession.extractedData.transaction_results.some(
+            (txn: any) => txn.processing_status === 'skipped' || !txn.processing_status ||
+            (txn.processing_status !== 'approved' && txn.processing_status !== 'skipped')
+          );
+
+          // Has in-progress session with pending work - allow continuation
+          if (hasSkippedOrUnprocessed) {
+            setButtonState('continue');
+          } else {
+            // All transactions are approved - no need to continue
+            setButtonState('process');
+          }
         } else {
-          // No session or empty - show process
+          // No in-progress session - show process
           setButtonState('process');
         }
       } catch (error) {
@@ -502,7 +514,7 @@ export default function ReceiptDetailsPage() {
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-medium">
                       {activeBatchSession?.extractedData?.transaction_results ? (
                         <Badge variant="outline" className="text-blue-600 bg-blue-500/5 border-blue-500/10 gap-1 px-2">
-                          <Loader2 size={12} className="animate-spin" /> In Progress ({activeBatchSession.totalProcessed || 0} of {activeBatchSession.totalExpected} approved)
+                          <Loader2 size={12} className="animate-spin" /> In Progress ({activeBatchSession.totalProcessed || 0} of {activeBatchSession.totalExpected} processed)
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-emerald-600 bg-emerald-500/5 border-emerald-500/10 gap-1 px-2">
@@ -648,7 +660,16 @@ export default function ReceiptDetailsPage() {
                 {isCheckingSession ? (
                   'Checking...'
                 ) : buttonState === 'continue' && activeBatchSession ? (
-                  `Continue Approval (${activeBatchSession.currentIndex || 0} of ${activeBatchSession.totalExpected})`
+                  (() => {
+                    const skippedCount = activeBatchSession.extractedData?.transaction_results?.filter(
+                      (txn: any) => txn.processing_status === 'skipped'
+                    ).length || 0;
+
+                    if (skippedCount > 0) {
+                      return `Continue Approval (${skippedCount} skipped)`;
+                    }
+                    return `Continue Approval (${activeBatchSession.currentIndex || 0} of ${activeBatchSession.totalExpected})`;
+                  })()
                 ) : (
                   'Initiate Transaction Processing'
                 )}

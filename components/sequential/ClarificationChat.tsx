@@ -38,10 +38,18 @@ interface ApiClarificationMessage {
 interface ChatMessage {
 	role: "assistant" | "user";
 	content: string;
-	questions?: string[];
+	questions?: QuestionObject[];
+}
+
+interface QuestionObject {
+	field: string;
+	question: string;
+	hint?: string;
+	suggestions?: string[];
 }
 
 interface QuestionAnswer {
+	field: string;
 	question: string;
 	answer: string;
 }
@@ -57,7 +65,7 @@ export function ClarificationChat({
 	const [isTyping, setIsTyping] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [pendingQuestions, setPendingQuestions] = useState<string[]>([]);
+	const [pendingQuestions, setPendingQuestions] = useState<QuestionObject[]>([]);
 	const [questionAnswers, setQuestionAnswers] = useState<QuestionAnswer[]>([]);
 	const [showForm, setShowForm] = useState(true);
 	const [freeFormMessage, setFreeFormMessage] = useState("");
@@ -111,7 +119,11 @@ export function ClarificationChat({
 				const lastAssistantMsg = apiMessages.reverse().find((msg: ChatMessage) => msg.role === "assistant" && msg.questions && msg.questions.length > 0);
 				if (lastAssistantMsg && lastAssistantMsg.questions) {
 					setPendingQuestions(lastAssistantMsg.questions);
-					setQuestionAnswers(lastAssistantMsg.questions.map((q: string) => ({ question: q, answer: "" })));
+					setQuestionAnswers(lastAssistantMsg.questions.map((q: QuestionObject) => ({
+						field: q.field,
+						question: q.question,
+						answer: ""
+					})));
 					setShowForm(true);
 				}
 			} catch (err: any) {
@@ -166,7 +178,11 @@ export function ClarificationChat({
 				// Update pending questions if there are new ones
 				if (currentTransaction.questions && currentTransaction.questions.length > 0) {
 					setPendingQuestions(currentTransaction.questions);
-					setQuestionAnswers(currentTransaction.questions.map((q: string) => ({ question: q, answer: "" })));
+					setQuestionAnswers(currentTransaction.questions.map((q: QuestionObject) => ({
+						field: q.field,
+						question: q.question,
+						answer: ""
+					})));
 					setShowForm(true); // Show form again for new questions
 				} else {
 					// No more questions, clear the form
@@ -242,7 +258,11 @@ export function ClarificationChat({
 				// Update pending questions if there are new ones
 				if (currentTransaction.questions && currentTransaction.questions.length > 0) {
 					setPendingQuestions(currentTransaction.questions);
-					setQuestionAnswers(currentTransaction.questions.map((q: string) => ({ question: q, answer: "" })));
+					setQuestionAnswers(currentTransaction.questions.map((q: QuestionObject) => ({
+						field: q.field,
+						question: q.question,
+						answer: ""
+					})));
 					setShowForm(true); // Show form again for new questions
 				} else {
 					// No more questions, clear the form
@@ -333,13 +353,20 @@ export function ClarificationChat({
 									{msg.role === "assistant" && msg.questions && msg.questions.length > 0 && (
 										<div className="mt-3 pt-3 border-t border-border/50 space-y-2 px-3 pb-3">
 											<p className="text-xs font-medium opacity-70">Please answer these questions:</p>
-											{msg.questions.map((question: string, qIdx: number) => (
+											{msg.questions.map((questionObj: QuestionObject, qIdx: number) => (
 												<div
 													key={qIdx}
-													className="bg-muted/30 rounded-lg p-2.5 text-xs border border-border/30"
+													className="bg-muted/30 rounded-lg p-2.5 text-xs border border-border/30 space-y-1"
 												>
-													<span className="font-semibold text-primary mr-1">Q{qIdx + 1}:</span>
-													{question}
+													<div>
+														<span className="font-semibold text-primary mr-1">Q{qIdx + 1}:</span>
+														{questionObj.question}
+													</div>
+													{questionObj.hint && (
+														<div className="text-xs text-muted-foreground italic pl-4">
+															💡 {questionObj.hint}
+														</div>
+													)}
 												</div>
 											))}
 										</div>
@@ -409,23 +436,48 @@ export function ClarificationChat({
 						<div className="p-4 min-h-[400px] max-h-[calc(100vh-400px)] overflow-y-auto">
 							{inputMode === "questions" ? (
 								<div className="space-y-4">
-									{questionAnswers.map((qa, idx) => (
-										<div key={idx} className="space-y-1.5">
-											<label className="text-xs font-medium text-muted-foreground">
-												<span className="text-primary">Q{idx + 1}:</span> {qa.question}
-											</label>
-											<Textarea
-												value={qa.answer}
-												onChange={(e) => {
-													const newAnswers = [...questionAnswers];
-													newAnswers[idx].answer = e.target.value;
-													setQuestionAnswers(newAnswers);
-												}}
-												placeholder="Type your answer..."
-												className="min-h-[60px] text-sm bg-muted/20 border-input focus:bg-background resize-none"
-											/>
-										</div>
-									))}
+									{questionAnswers.map((qa, idx) => {
+										const questionObj = pendingQuestions[idx];
+										return (
+											<div key={idx} className="space-y-1.5">
+												<label className="text-xs font-medium text-muted-foreground">
+													<span className="text-primary">Q{idx + 1}:</span> {qa.question}
+												</label>
+												{questionObj?.hint && (
+													<p className="text-xs text-muted-foreground italic">
+														💡 {questionObj.hint}
+													</p>
+												)}
+												<Textarea
+													value={qa.answer}
+													onChange={(e) => {
+														const newAnswers = [...questionAnswers];
+														newAnswers[idx].answer = e.target.value;
+														setQuestionAnswers(newAnswers);
+													}}
+													placeholder={questionObj?.hint || "Type your answer..."}
+													className="min-h-[60px] text-sm bg-muted/20 border-input focus:bg-background resize-none"
+												/>
+												{questionObj?.suggestions && questionObj.suggestions.length > 0 && (
+													<div className="flex flex-wrap gap-1.5 mt-2">
+														{questionObj.suggestions.map((suggestion, sIdx) => (
+															<button
+																key={sIdx}
+																onClick={() => {
+																	const newAnswers = [...questionAnswers];
+																	newAnswers[idx].answer = suggestion;
+																	setQuestionAnswers(newAnswers);
+																}}
+																className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 border border-border rounded-md transition-colors"
+															>
+																{suggestion}
+															</button>
+														))}
+													</div>
+												)}
+											</div>
+										);
+									})}
 
 									<Button
 										onClick={handleSendAnswers}

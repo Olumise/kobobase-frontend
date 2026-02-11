@@ -13,10 +13,10 @@ interface Transaction {
 	confidence_score?: number;
 	processing_status?: 'approved' | 'skipped' | undefined;
 	created_transaction_id?: string | null;
-	transaction?: {
+	transaction: {
 		amount?: number;
 		description?: string;
-	};
+	} | null;
 }
 
 interface TransactionStepperProps {
@@ -36,12 +36,21 @@ export function TransactionStepper({
 		? (currentIndex / (transactions.length - 1)) * 100
 		: 0;
 
-	const getTransactionState = (txn: Transaction) => {
-		if (txn.processing_status === 'approved') return 'approved';
-		if (txn.processing_status === 'skipped') return 'skipped';
+	// Get the data quality state (independent of processing status)
+	const getDataQualityState = (txn: Transaction) => {
 		if (txn.needs_clarification) return 'clarification';
 		if (txn.needs_confirmation) return 'confirmation';
 		return 'ready';
+	};
+
+	// Get the combined state for visual representation
+	const getTransactionState = (txn: Transaction) => {
+		// Processing status takes visual priority for the main indicator
+		if (txn.processing_status === 'approved') return 'approved';
+		if (txn.processing_status === 'skipped') return 'skipped';
+
+		// If not processed, show data quality state
+		return getDataQualityState(txn);
 	};
 
 	const getStateIcon = (state: string) => {
@@ -158,24 +167,39 @@ export function TransactionStepper({
 												${txn.transaction.amount.toLocaleString()}
 											</p>
 										)}
-										{state === 'approved' && (
+
+										{/* Processing Status */}
+										{txn.processing_status === 'approved' && (
 											<p className="text-emerald-600 font-medium">✓ Approved</p>
 										)}
-										{state === 'skipped' && (
+										{txn.processing_status === 'skipped' && (
 											<p className="text-gray-600 font-medium">⏭ Skipped</p>
 										)}
-										{state === 'clarification' && (
+
+										{/* Data Quality State - shown independently */}
+										{!txn.processing_status && txn.needs_clarification && (
 											<p className="text-amber-500">Needs clarification</p>
 										)}
-										{state === 'confirmation' && (
+										{!txn.processing_status && txn.needs_confirmation && (
 											<p className="text-blue-500">Needs confirmation</p>
 										)}
+										{!txn.processing_status && !txn.needs_clarification && !txn.needs_confirmation && (
+											<p className="text-green-600">Ready to process</p>
+										)}
+
+										{/* Show data quality even when processed */}
+										{txn.processing_status && (txn.needs_clarification || txn.needs_confirmation) && (
+											<p className="text-muted-foreground text-[10px]">
+												{txn.needs_clarification ? '(had clarification issues)' : '(needed confirmation)'}
+											</p>
+										)}
+
 										{txn.created_transaction_id && (
 											<p className="text-muted-foreground font-mono text-[10px]">
 												ID: {txn.created_transaction_id.slice(0, 8)}...
 											</p>
 										)}
-										{txn.confidence_score && !txn.processing_status && (
+										{txn.confidence_score && (
 											<p className="text-muted-foreground">
 												{Math.round(txn.confidence_score * 100)}% confidence
 											</p>

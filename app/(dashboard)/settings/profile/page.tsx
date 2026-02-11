@@ -24,8 +24,7 @@ import {
 } from '@/components/ui/select';
 import { userApi } from '@/lib/api';
 import type { UserProfile } from '@/lib/types/user';
-import { useAppDispatch } from '@/store/hooks';
-import { updateUserProfile as updateReduxProfile } from '@/store/slices/authSlice';
+import { useSession } from '@/lib/auth-client';
 
 
 const CURRENCIES = [
@@ -67,7 +66,7 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
-  const dispatch = useAppDispatch();
+  const { data: session, refetch: refetchSession } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -204,8 +203,8 @@ export default function ProfilePage() {
       const updatedProfile = response.data?.data || response.data;
       setProfile(updatedProfile);
 
-      // Update Redux store with new profile data
-      dispatch(updateReduxProfile(updatedProfile));
+      // Refetch session to update Better Auth's state with new profile data
+      await refetchSession();
 
       setSuccess('Profile updated successfully!');
 

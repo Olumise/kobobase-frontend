@@ -20,9 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAppDispatch } from "@/store/hooks"
-import { setUser } from "@/store/slices/authSlice"
-import { login } from "@/lib/auth"
+import { signIn } from "@/lib/auth-client"
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -37,7 +35,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const dispatch = useAppDispatch()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -51,12 +48,21 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
     try {
-      // Login will set HTTP-only cookies automatically via Better Auth
-      const user = await login(values.email, values.password)
-      dispatch(setUser(user))
+      // Use Better Auth's signIn method
+      const { data, error: authError } = await signIn.email({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (authError) {
+        setError(authError.message || 'Invalid email or password')
+        return
+      }
+
+      // Better Auth's useSession hook will automatically update state
       router.push('/dashboard')
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || 'Login failed. Please try again.'
+      const errorMessage = error?.message || 'Login failed. Please try again.'
       setError(errorMessage)
       console.error('Login failed:', error)
     } finally {

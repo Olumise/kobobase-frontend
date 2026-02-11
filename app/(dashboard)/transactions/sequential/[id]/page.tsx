@@ -78,6 +78,19 @@ export default function SequentialProcessingPage() {
 		}
 	}, [params.id]);
 
+	// Helper function to calculate session statistics
+	const getSessionStats = () => {
+		const total = transactions.length;
+		const approved = transactions.filter(t => t.processing_status === "approved").length;
+		const skipped = transactions.filter(t => t.processing_status === "skipped").length;
+		const unprocessed = total - approved - skipped;
+		const hasRemainingWork = unprocessed > 0 || skipped > 0;
+
+		return { total, approved, skipped, unprocessed, hasRemainingWork };
+	};
+
+	const currentTxn = transactions[currentIndex];
+
 	// Keyboard navigation
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -95,7 +108,9 @@ export default function SequentialProcessingPage() {
 			} else if (
 				e.key === "ArrowRight" &&
 				currentIndex < transactions.length - 1 &&
-				!isLoading
+				!isLoading &&
+				currentTxn &&
+				(currentTxn.processing_status === "approved" || currentTxn.processing_status === "skipped")
 			) {
 				e.preventDefault();
 				handleNext();
@@ -104,25 +119,138 @@ export default function SequentialProcessingPage() {
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [currentIndex, transactions.length, isLoading]);
-
-	const currentTxn = transactions[currentIndex];
+	}, [currentIndex, transactions.length, isLoading, currentTxn]);
 
 	const handleApprove = async (edits?: any) => {
 		if (!batchSession?.id) return;
 
 		try {
 			setIsApproving(true);
+			const previousIndex = currentIndex;
 			await transactionsApi.approveAndNext(batchSession.id, edits);
 
-			if (currentIndex < transactions.length - 1) {
-				setCurrentIndex((prev) => prev + 1);
+			await fetchBatchSession();
+
+			const stats = getSessionStats();
+
+			// If we're at the last index position
+			if (previousIndex >= transactions.length - 1) {
+				// Check if there's remaining work
+				if (stats.hasRemainingWork) {
+					// Find first unprocessed or skipped transaction
+					const nextIndex = transactions.findIndex(t =>
+						!t.processing_status || t.processing_status === "skipped"
+					);
+
+					if (nextIndex !== -1) {
+						// Navigate to first remaining transaction
+						try {
+							setIsLoading(true);
+							await transactionsApi.getTransactionByIndex(batchSession.id, nextIndex);
+							setCurrentIndex(nextIndex);
+							setError(null);
+						} catch (err: any) {
+							console.error("Error navigating to remaining transaction:", err);
+							setError(err.response?.data?.message || "Failed to navigate to remaining transaction");
+						} finally {
+							setIsLoading(false);
+						}
+						return;
+					}
+				}
+
+				// Only complete session if ALL transactions are approved
+				if (stats.approved === stats.total) {
+					await transactionsApi.completeSession(batchSession.id);
+					router.push("/receipts");
+					return;
+				}
 			} else {
-				await transactionsApi.completeSession(batchSession.id);
-				router.push("/receipts");
+				// Normal flow: navigate to next transaction
+				const targetIndex = previousIndex + 1;
+				try {
+					setIsLoading(true);
+					await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
+					setCurrentIndex(targetIndex);
+					setError(null);
+				} catch (err: any) {
+					console.error("Error navigating to next transaction:", err);
+					setError(err.response?.data?.message || "Failed to navigate to next transaction");
+				} finally {
+					setIsLoading(false);
+				}
 			}
 		} catch (err: any) {
 			console.error("Error approving transaction:", err);
+			setError(err.response?.data?.message || "Failed to approve transaction");
+		} finally {
+			setIsApproving(false);
+		}
+	};
+
+	const handleSkip = async () => {
+		if (!batchSession?.id) return;
+
+		try {
+			setIsApproving(true);
+			const previousIndex = currentIndex;
+			await transactionsApi.skipTransaction(batchSession.id);
+
+			// Refetch batch session to get updated data
+			await fetchBatchSession();
+
+			const stats = getSessionStats();
+
+			// If we're at the last index position
+			if (previousIndex >= transactions.length - 1) {
+				// Check if there's remaining work
+				if (stats.hasRemainingWork) {
+					// Find first unprocessed or skipped transaction
+					const nextIndex = transactions.findIndex(t =>
+						!t.processing_status || t.processing_status === "skipped"
+					);
+
+					if (nextIndex !== -1) {
+						// Navigate to first remaining transaction
+						try {
+							setIsLoading(true);
+							await transactionsApi.getTransactionByIndex(batchSession.id, nextIndex);
+							setCurrentIndex(nextIndex);
+							setError(null);
+						} catch (err: any) {
+							console.error("Error navigating to remaining transaction:", err);
+							setError(err.response?.data?.message || "Failed to navigate to remaining transaction");
+						} finally {
+							setIsLoading(false);
+						}
+						return;
+					}
+				}
+
+				// Only complete session if ALL transactions are approved
+				if (stats.approved === stats.total) {
+					await transactionsApi.completeSession(batchSession.id);
+					router.push("/receipts");
+					return;
+				}
+			} else {
+				// Normal flow: navigate to next transaction
+				const targetIndex = previousIndex + 1;
+				try {
+					setIsLoading(true);
+					await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
+					setCurrentIndex(targetIndex);
+					setError(null);
+				} catch (err: any) {
+					console.error("Error navigating to next transaction:", err);
+					setError(err.response?.data?.message || "Failed to navigate to next transaction");
+				} finally {
+					setIsLoading(false);
+				}
+			}
+		} catch (err: any) {
+			console.error("Error skipping transaction:", err);
+			setError(err.response?.data?.message || "Failed to skip transaction");
 		} finally {
 			setIsApproving(false);
 		}
@@ -135,8 +263,8 @@ export default function SequentialProcessingPage() {
 			setIsLoading(true);
 			const targetIndex = currentIndex - 1;
 			await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
-			// Refetch batch session to get updated data
-			await fetchBatchSession();
+			setCurrentIndex(targetIndex);
+			setError(null);
 		} catch (err: any) {
 			console.error("Error navigating to previous transaction:", err);
 			setError(err.response?.data?.message || "Failed to navigate to previous transaction");
@@ -148,12 +276,19 @@ export default function SequentialProcessingPage() {
 	const handleNext = async () => {
 		if (!batchSession?.id || currentIndex >= transactions.length - 1) return;
 
+		// Check if current transaction is approved or skipped before allowing next
+		const canProceed = currentTxn?.processing_status === "approved" || currentTxn?.processing_status === "skipped";
+		if (!canProceed) {
+			setError("Please approve or skip the current transaction before proceeding to the next one.");
+			return;
+		}
+
 		try {
 			setIsLoading(true);
 			const targetIndex = currentIndex + 1;
 			await transactionsApi.getTransactionByIndex(batchSession.id, targetIndex);
-			// Refetch batch session to get updated data
-			await fetchBatchSession();
+			setCurrentIndex(targetIndex);
+			setError(null);
 		} catch (err: any) {
 			console.error("Error navigating to next transaction:", err);
 			setError(err.response?.data?.message || "Failed to navigate to next transaction");
@@ -168,8 +303,8 @@ export default function SequentialProcessingPage() {
 		try {
 			setIsLoading(true);
 			await transactionsApi.getTransactionByIndex(batchSession.id, index);
-			// Refetch batch session to get updated data
-			await fetchBatchSession();
+			setCurrentIndex(index);
+			setError(null);
 		} catch (err: any) {
 			console.error("Error navigating to transaction:", err);
 			setError(err.response?.data?.message || "Failed to navigate to transaction");
@@ -178,15 +313,17 @@ export default function SequentialProcessingPage() {
 		}
 	};
 
+	// Prioritize data quality state over processing status
+	// This ensures clarification/confirmation alerts show even for skipped/approved transactions
 	const currentTxnState: TransactionState =
-		currentTxn?.processing_status === "approved"
-			? "APPROVED"
-			: currentTxn?.processing_status === "skipped"
-				? "SKIPPED"
-				: currentTxn?.needs_clarification
-					? "CLARIFICATION_NEEDED"
-					: currentTxn?.needs_confirmation
-						? "NEEDS_CONFIRMATION"
+		currentTxn?.needs_clarification
+			? "CLARIFICATION_NEEDED"
+			: currentTxn?.needs_confirmation
+				? "NEEDS_CONFIRMATION"
+				: currentTxn?.processing_status === "approved"
+					? "APPROVED"
+					: currentTxn?.processing_status === "skipped"
+						? "SKIPPED"
 						: "READY";
 
 	// Loading state
@@ -294,23 +431,29 @@ export default function SequentialProcessingPage() {
 			</Card>
 
 			<div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full pb-12">
-				<AnimatePresence mode="wait">
-					<motion.div
-						key={currentTxn.transaction_index}
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-						exit={{ opacity: 0, x: -20 }}
-						className="w-full">
-						<TransactionReviewCard
-							transaction={currentTxn}
-							state={currentTxnState}
-							onApprove={handleApprove}
-							onSkip={() => {}}
-							onClarify={() => setIsChatOpen(true)}
-							isApproving={isApproving}
-						/>
-					</motion.div>
-				</AnimatePresence>
+				{currentTxn ? (
+					<AnimatePresence mode="wait">
+						<motion.div
+							key={currentTxn.transaction_index}
+							initial={{ opacity: 0, x: 20 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: -20 }}
+							className="w-full">
+							<TransactionReviewCard
+								transaction={currentTxn}
+								state={currentTxnState}
+								onApprove={handleApprove}
+								onSkip={handleSkip}
+								onClarify={() => setIsChatOpen(true)}
+								isApproving={isApproving}
+							/>
+						</motion.div>
+					</AnimatePresence>
+				) : (
+					<div className="flex items-center justify-center">
+						<p className="text-muted-foreground">Loading transaction...</p>
+					</div>
+				)}
 
 				{/* Navigation Info */}
 				<div className="mt-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-12 text-sm text-muted-foreground font-medium">
@@ -336,7 +479,12 @@ export default function SequentialProcessingPage() {
 
 					<button
 						onClick={handleNext}
-						disabled={currentIndex === transactions.length - 1 || isLoading}
+						disabled={
+							currentIndex === transactions.length - 1 ||
+							isLoading ||
+							!currentTxn ||
+							(currentTxn.processing_status !== "approved" && currentTxn.processing_status !== "skipped")
+						}
 						className="flex items-center gap-1 hover:text-foreground disabled:opacity-30 transition-colors">
 						<kbd className="mr-1 px-1.5 py-0.5 text-xs bg-muted rounded border hidden sm:inline-block">
 							→
