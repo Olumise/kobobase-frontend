@@ -78,17 +78,6 @@ export default function SequentialProcessingPage() {
 		}
 	}, [params.id]);
 
-	// Helper function to calculate session statistics
-	const getSessionStats = () => {
-		const total = transactions.length;
-		const approved = transactions.filter(t => t.processing_status === "approved").length;
-		const skipped = transactions.filter(t => t.processing_status === "skipped").length;
-		const unprocessed = total - approved - skipped;
-		const hasRemainingWork = unprocessed > 0 || skipped > 0;
-
-		return { total, approved, skipped, unprocessed, hasRemainingWork };
-	};
-
 	const currentTxn = transactions[currentIndex];
 
 	// Keyboard navigation
@@ -142,22 +131,20 @@ export default function SequentialProcessingPage() {
 			// Calculate stats from the fresh data
 			const total = freshTransactions.length;
 			const approved = freshTransactions.filter(t => t.processing_status === "approved").length;
-			const skipped = freshTransactions.filter(t => t.processing_status === "skipped").length;
-			const processed = approved + skipped;
 
 			// If we're at the last index position
 			if (previousIndex >= freshTransactions.length - 1) {
-				// Check if all transactions are processed (approved or skipped)
-				if (processed === total) {
-					// All done - complete the session and redirect
+				// Check if ALL transactions are approved (skipped doesn't count as done)
+				if (approved === total) {
+					// All approved - complete the session and redirect
 					await transactionsApi.completeSession(batchSession.id);
 					router.push("/receipts");
 					return;
 				}
 
-				// If not all processed, find first unprocessed or skipped transaction
+				// If not all approved, find first unprocessed transaction (NOT skipped)
 				const nextIndex = freshTransactions.findIndex(t =>
-					!t.processing_status || t.processing_status === "skipped"
+					!t.processing_status || (t.processing_status !== "approved" && t.processing_status !== "skipped")
 				);
 
 				if (nextIndex !== -1) {
@@ -174,6 +161,11 @@ export default function SequentialProcessingPage() {
 					}
 					return;
 				}
+
+				// If only skipped transactions remain, don't auto-complete
+				// User should manually complete the session when ready
+				router.push("/receipts");
+				return;
 			} else {
 				// Normal flow: navigate to next transaction
 				const targetIndex = previousIndex + 1;
@@ -200,48 +192,65 @@ export default function SequentialProcessingPage() {
 	const handleSkip = async () => {
 		if (!batchSession?.id) return;
 
+		// Prevent skipping already processed transactions
+		if (currentTxn?.processing_status === "approved" || currentTxn?.processing_status === "skipped") {
+			setError("This transaction has already been processed.");
+			return;
+		}
+
 		try {
 			setIsApproving(true);
 			const previousIndex = currentIndex;
 			await transactionsApi.skipTransaction(batchSession.id);
 
 			// Refetch batch session to get updated data
-			await fetchBatchSession();
+			const batchSessionId = params.id as string;
+			const response = await transactionsApi.getBatchSessionInfo(batchSessionId);
+			const sessionData: BatchSession = response.data.data;
+			setBatchSession(sessionData);
 
-			const stats = getSessionStats();
+			// Get fresh transactions data
+			const freshTransactions = (sessionData.extractedData?.transaction_results || []) as ReviewTransaction[];
+			setTransactions(freshTransactions);
+
+			// Calculate stats from the fresh data
+			const total = freshTransactions.length;
+			const approved = freshTransactions.filter(t => t.processing_status === "approved").length;
 
 			// If we're at the last index position
-			if (previousIndex >= transactions.length - 1) {
-				// Check if there's remaining work
-				if (stats.hasRemainingWork) {
-					// Find first unprocessed or skipped transaction
-					const nextIndex = transactions.findIndex(t =>
-						!t.processing_status || t.processing_status === "skipped"
-					);
-
-					if (nextIndex !== -1) {
-						// Navigate to first remaining transaction
-						try {
-							setIsLoading(true);
-							await transactionsApi.getTransactionByIndex(batchSession.id, nextIndex);
-							setCurrentIndex(nextIndex);
-							setError(null);
-						} catch (err: any) {
-							console.error("Error navigating to remaining transaction:", err);
-							setError(err.response?.data?.message || "Failed to navigate to remaining transaction");
-						} finally {
-							setIsLoading(false);
-						}
-						return;
-					}
-				}
-
-				// Only complete session if ALL transactions are approved
-				if (stats.approved === stats.total) {
+			if (previousIndex >= freshTransactions.length - 1) {
+				// Check if ALL transactions are approved (skipped doesn't count as done)
+				if (approved === total) {
+					// All approved - complete the session and redirect
 					await transactionsApi.completeSession(batchSession.id);
 					router.push("/receipts");
 					return;
 				}
+
+				// If not all approved, find first unprocessed transaction (NOT skipped)
+				const nextIndex = freshTransactions.findIndex(t =>
+					!t.processing_status || (t.processing_status !== "approved" && t.processing_status !== "skipped")
+				);
+
+				if (nextIndex !== -1) {
+					try {
+						setIsLoading(true);
+						await transactionsApi.getTransactionByIndex(batchSession.id, nextIndex);
+						setCurrentIndex(nextIndex);
+						setError(null);
+					} catch (err: any) {
+						console.error("Error navigating to remaining transaction:", err);
+						setError(err.response?.data?.message || "Failed to navigate to remaining transaction");
+					} finally {
+						setIsLoading(false);
+					}
+					return;
+				}
+
+				// If only skipped transactions remain, don't auto-complete
+				// User should manually complete the session when ready
+				router.push("/receipts");
+				return;
 			} else {
 				// Normal flow: navigate to next transaction
 				const targetIndex = previousIndex + 1;

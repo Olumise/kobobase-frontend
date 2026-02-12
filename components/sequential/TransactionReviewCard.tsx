@@ -10,6 +10,7 @@ import {
 	Sparkles,
 	Calendar as CalendarIcon,
 	Loader2,
+	Plus,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -39,6 +40,8 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { contactsApi, categoriesApi, transactionsApi } from "@/lib/api";
+import { CategoryFormModal } from "@/components/categories/CategoryFormModal";
+import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 
 export type TransactionState =
 	| "READY"
@@ -64,6 +67,7 @@ interface TransactionEdits {
 	description?: string;
 	transactionDate?: string;
 	paymentMethod?: string;
+	transactionType?: string;
 }
 
 interface TransactionReviewCardProps {
@@ -78,7 +82,17 @@ interface TransactionReviewCardProps {
 const paymentMethods = [
 	{ label: "Cash Payment", value: "cash" },
 	{ label: "Bank Transfer", value: "transfer" },
-	{ label: "Card Payment", value: "card" }
+	{ label: "Card Payment", value: "card" },
+	{ label: "Other", value: "other" }
+];
+
+const transactionTypes = [
+	{ label: "Income", value: "INCOME" },
+	{ label: "Expense", value: "EXPENSE" },
+	{ label: "Transfer", value: "TRANSFER" },
+	{ label: "Refund", value: "REFUND" },
+	{ label: "Fee", value: "FEE" },
+	{ label: "Adjustment", value: "ADJUSTMENT" }
 ];
 
 export function TransactionReviewCard({
@@ -97,6 +111,10 @@ export function TransactionReviewCard({
 	const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 	const [isLoadingBankAccounts, setIsLoadingBankAccounts] = useState(false);
 
+	// Modal states
+	const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+	const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+
 	const [description, setDescription] = useState<string>(
 		transaction?.transaction?.description || ""
 	);
@@ -108,9 +126,12 @@ export function TransactionReviewCard({
 			? new Date(transaction.transaction.time_sent)
 			: undefined
 	);
-	const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>(
-		transaction?.transaction?.payment_method || ""
-	);
+	const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>(() => {
+		const paymentMethod = transaction?.transaction?.payment_method;
+		// Only set if it's a valid payment method, otherwise empty to require selection
+		const validMethods = ["cash", "transfer", "card", "other"];
+		return validMethods.includes(paymentMethod) ? paymentMethod : "";
+	});
 	const [selectedContact, setSelectedContact] = useState<string>(
 		transaction?.enrichment_data?.contact_id || ""
 	);
@@ -120,46 +141,49 @@ export function TransactionReviewCard({
 	const [selectedToBankAccount, setSelectedToBankAccount] = useState<string>(
 		transaction?.enrichment_data?.to_bank_account_id || ""
 	);
+	const [selectedTransactionType, setSelectedTransactionType] = useState<string>(
+		transaction?.transaction?.transaction_type?.toUpperCase() || ""
+	);
+
+	const fetchContacts = async () => {
+		setIsLoadingContacts(true);
+		try {
+			const response = await contactsApi.getAllContacts();
+			setContacts(response.data.data);
+		} catch (error) {
+			console.error("Failed to fetch contacts:", error);
+		} finally {
+			setIsLoadingContacts(false);
+		}
+	};
+
+	const fetchCategories = async () => {
+		setIsLoadingCategories(true);
+		try {
+			const response = await categoriesApi.getAllCategories();
+			setCategories(response.data.data.categories);
+		} catch (error) {
+			console.error("Failed to fetch categories:", error);
+		} finally {
+			setIsLoadingCategories(false);
+		}
+	};
+
+	const fetchBankAccounts = async () => {
+		setIsLoadingBankAccounts(true);
+		try {
+			const response = await transactionsApi.getUserBankAccounts();
+			const accounts = response.data.data?.accounts || response.data.accounts || [];
+			setBankAccounts(accounts);
+		} catch (error) {
+			console.error("Failed to fetch bank accounts:", error);
+			setBankAccounts([]);
+		} finally {
+			setIsLoadingBankAccounts(false);
+		}
+	};
 
 	useEffect(() => {
-		const fetchContacts = async () => {
-			setIsLoadingContacts(true);
-			try {
-				const response = await contactsApi.getAllContacts();
-				setContacts(response.data.data);
-			} catch (error) {
-				console.error("Failed to fetch contacts:", error);
-			} finally {
-				setIsLoadingContacts(false);
-			}
-		};
-
-		const fetchCategories = async () => {
-			setIsLoadingCategories(true);
-			try {
-				const response = await categoriesApi.getAllCategories();
-				setCategories(response.data.data.categories);
-			} catch (error) {
-				console.error("Failed to fetch categories:", error);
-			} finally {
-				setIsLoadingCategories(false);
-			}
-		};
-
-		const fetchBankAccounts = async () => {
-			setIsLoadingBankAccounts(true);
-			try {
-				const response = await transactionsApi.getUserBankAccounts();
-				const accounts = response.data.data?.accounts || response.data.accounts || [];
-				setBankAccounts(accounts);
-			} catch (error) {
-				console.error("Failed to fetch bank accounts:", error);
-				setBankAccounts([]);
-			} finally {
-				setIsLoadingBankAccounts(false);
-			}
-		};
-
 		fetchContacts();
 		fetchCategories();
 		fetchBankAccounts();
@@ -184,9 +208,10 @@ export function TransactionReviewCard({
 	}, [transaction?.transaction?.time_sent]);
 
 	useEffect(() => {
-		if (transaction?.transaction?.payment_method) {
-			setSelectedPaymentMethod(transaction.transaction.payment_method);
-		}
+		const paymentMethod = transaction?.transaction?.payment_method;
+		// Only set if it's a valid payment method, otherwise empty to require selection
+		const validMethods = ["cash", "transfer", "card", "other"];
+		setSelectedPaymentMethod(validMethods.includes(paymentMethod) ? paymentMethod : "");
 	}, [transaction?.transaction?.payment_method]);
 
 	useEffect(() => {
@@ -206,6 +231,12 @@ export function TransactionReviewCard({
 			setSelectedToBankAccount(transaction.enrichment_data.to_bank_account_id);
 		}
 	}, [transaction?.enrichment_data?.to_bank_account_id]);
+
+	useEffect(() => {
+		if (transaction?.transaction?.transaction_type) {
+			setSelectedTransactionType(transaction.transaction.transaction_type.toUpperCase());
+		}
+	}, [transaction?.transaction?.transaction_type]);
 
 	const getHeaderConfig = () => {
 		switch (state) {
@@ -268,6 +299,10 @@ export function TransactionReviewCard({
 
 		if (selectedPaymentMethod !== (transaction?.transaction?.payment_method || "")) {
 			edits.paymentMethod = selectedPaymentMethod;
+		}
+
+		if (selectedTransactionType !== (transaction?.transaction?.transaction_type || "")) {
+			edits.transactionType = selectedTransactionType;
 		}
 
 		if (selectedUserBankAccount !== (transaction?.enrichment_data?.user_bank_account_id || "")) {
@@ -458,8 +493,41 @@ export function TransactionReviewCard({
 
 							<div className="space-y-2">
 								<label className="text-sm font-medium text-muted-foreground">
-									Category
+									Transaction Type
 								</label>
+								<Select
+									value={selectedTransactionType}
+									onValueChange={setSelectedTransactionType}>
+									<SelectTrigger className="bg-background w-full">
+										<SelectValue placeholder="Select type" />
+									</SelectTrigger>
+									<SelectContent>
+										{transactionTypes.map((type) => (
+											<SelectItem
+												key={type.value}
+												value={type.value}>
+												{type.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<label className="text-sm font-medium text-muted-foreground">
+										Category
+									</label>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-auto p-0 text-xs text-primary hover:text-primary/80 hover:bg-transparent"
+										onClick={() => setIsCategoryModalOpen(true)}>
+										<Plus size={14} className="mr-1" />
+										Add New
+									</Button>
+								</div>
 								<Select
 									value={selectedCategory}
 									onValueChange={setSelectedCategory}>
@@ -483,6 +551,7 @@ export function TransactionReviewCard({
 											<SelectItem
 												key={category?.id}
 												value={category?.id}>
+												{category?.icon && <span className="mr-2">{category?.icon}</span>}
 												{category?.name}
 											</SelectItem>
 										))}
@@ -551,9 +620,20 @@ export function TransactionReviewCard({
 							</div>
 
 							<div className="space-y-2">
-								<label className="text-sm font-medium text-muted-foreground">
-									Contact
-								</label>
+								<div className="flex items-center justify-between">
+									<label className="text-sm font-medium text-muted-foreground">
+										Contact
+									</label>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-auto p-0 text-xs text-primary hover:text-primary/80 hover:bg-transparent"
+										onClick={() => setIsContactModalOpen(true)}>
+										<Plus size={14} className="mr-1" />
+										Add New
+									</Button>
+								</div>
 								<Select
 									value={selectedContact}
 									onValueChange={setSelectedContact}>
@@ -719,6 +799,27 @@ export function TransactionReviewCard({
 					raw_text: "WHOLE FOODS MARKET... TOTAL $51.46"
 				</p>
 			</div>
+
+			{/* Category Modal */}
+			<CategoryFormModal
+				category={null}
+				open={isCategoryModalOpen}
+				onOpenChange={setIsCategoryModalOpen}
+				onSave={async () => {
+					await fetchCategories();
+				}}
+			/>
+
+			{/* Contact Modal */}
+			<ContactFormModal
+				contact={null}
+				categories={categories}
+				open={isContactModalOpen}
+				onOpenChange={setIsContactModalOpen}
+				onSave={async () => {
+					await fetchContacts();
+				}}
+			/>
 		</div>
 	);
 }
