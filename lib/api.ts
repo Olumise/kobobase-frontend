@@ -339,4 +339,31 @@ export const userApi = {
 	},
 };
 
+// Chat API
+export const chatApi = {
+	// Create new chat session
+	createSession: () =>
+		api.post("/chat/session"),
+
+	// Get all user sessions with previews
+	getAllSessions: () =>
+		api.get("/chat/sessions"),
+
+	// Get single session with all messages
+	getSession: (sessionId: string) =>
+		api.get(`/chat/session/${sessionId}`),
+
+	// Send message and get AI response
+	sendMessage: (sessionId: string, query: string) =>
+		api.post(`/chat/session/${sessionId}/message`, { query }),
+
+	// Mark session as completed
+	completeSession: (sessionId: string) =>
+		api.patch(`/chat/session/${sessionId}/complete`),
+
+	// Delete session
+	deleteSession: (sessionId: string) =>
+		api.delete(`/chat/session/${sessionId}`),
+};
+
 export default api;

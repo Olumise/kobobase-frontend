@@ -11,7 +11,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Receipts', href: '/receipts', icon: Receipt },
   { name: 'Transactions', href: '/transactions', icon: CreditCard },
+  { name: 'Chat Assistant', href: '/chat', icon: MessageSquare },
   { name: 'Analytics', href: '/analytics', icon: PieChart },
   { name: 'Settings', href: '/settings/categories', icon: Settings },
 ];
